@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 
 export default function AdminPage() {
   const [repairs, setRepairs] = useState<any[]>([]);
+  const [comments, setComments] = useState<{ [key: number]: string }>({});
   useEffect(() => {
   loadRepairs();
 }, []);
@@ -29,10 +30,19 @@ async function loadRepairs() {
 }
 async function updateStatus(id: number, status: string) {
   console.log("クリック", id, status);
+
+  const repair = repairs.find((r) => r.id === id);
+
+  const newHistory =
+    (repair?.history ?? "") +
+     `${new Date().toLocaleString("ja-JP")}　${status}\n`;
   
   const { data, error } = await supabase
   .from("repair_requests")
-  .update({ status })
+  .update({
+  status,
+ history: newHistory,
+})
   .eq("id", id)
   .select();
 
@@ -43,6 +53,24 @@ async function updateStatus(id: number, status: string) {
     alert(error.message);
     return;
   }
+
+  loadRepairs();
+}
+
+async function saveComment(id: number) {
+  const { error } = await supabase
+    .from("repair_requests")
+    .update({
+      staff_comment: comments[id] ?? "",
+    })
+    .eq("id", id);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  alert("コメントを保存しました");
 
   loadRepairs();
 }
@@ -96,6 +124,33 @@ async function updateStatus(id: number, status: string) {
               <p className="mt-2 font-bold">
                ステータス：{repair.status}
                </p>
+               {repair.history && (
+                <div className="mt-2 rounded bg-gray-100 p-3 text-sm">
+                <p className="font-bold">📅 対応履歴</p>
+                <pre className="whitespace-pre-wrap">
+                  {repair.history}
+                </pre>
+                </div>
+               )}
+
+              <textarea
+                className="mt-4 w-full rounded border p-2"
+                placeholder="担当者コメントを入力"
+                value={comments[repair.id] ?? repair.staff_comment ?? ""}
+                onChange={(e) =>
+                  setComments({
+                   ...comments,
+                  [repair.id]: e.target.value,
+                })
+               }
+              />
+
+                <button
+                  onClick={() => saveComment(repair.id)}
+                  className="mt-2 rounded bg-gray-800 px-4 py-2 text-white"
+                >
+                  コメント保存
+                </button>
 
                <div className="mt-4 flex gap-2">
                <button
