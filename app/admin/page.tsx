@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 
 export default function AdminPage() {
   const [repairs, setRepairs] = useState<any[]>([]);
@@ -74,7 +76,83 @@ async function saveComment(id: number) {
 
   loadRepairs();
 }
+  async function createPdf(repair: any) {
+  const doc = new jsPDF();
   
+
+
+  const logoResponse = await fetch("/credo-logo.png");
+  const logoBlob = await logoResponse.blob();
+
+  const logoReader = new FileReader();
+
+  await new Promise<void>((resolve) => {
+    logoReader.onloadend = () => resolve();
+    logoReader.readAsDataURL(logoBlob);
+  });
+
+  const logoData = logoReader.result as string;
+
+  if (repair.photo_url) {
+  const response = await fetch(repair.photo_url);
+  const blob = await response.blob();
+
+  const reader = new FileReader();
+
+  await new Promise<void>((resolve) => {
+    reader.onloadend = () => resolve();
+    reader.readAsDataURL(blob);
+  });
+
+  const imageData = reader.result as string;
+
+  doc.addImage(imageData, "JPEG", 115, 35, 80, 80);
+}
+
+  doc.setDrawColor(30, 64, 175);
+  doc.setFillColor(30, 64, 175);
+  doc.rect(0, 0, 210, 18, "F");
+
+  doc.addImage(logoData, "PNG", 8, 2, 12, 12);
+
+  doc.setTextColor(255, 255, 255);
+  doc.setTextColor(255, 255, 255);
+
+  doc.setFontSize(16);
+  doc.text("CREDO", 24, 8);
+
+  doc.setFontSize(11);
+  doc.text("Repair Report", 24, 13);
+
+  doc.setTextColor(0, 0, 0);
+
+  
+  doc.setFontSize(12);
+  doc.text(`Property : ${repair.property_name}`, 20, 40);
+  doc.text(`Room : ${repair.room_number}`, 20, 50);
+  doc.text(`Tenant : ${repair.tenant_name}`, 20, 60);
+  doc.text(`Category : ${repair.category}`, 20, 70);
+  doc.text(`Status : ${repair.status}`, 20, 80);
+
+  autoTable(doc, {
+    startY: 95,
+   head: [["Item", "Details"]],
+   body: [
+    ["Description", repair.description],
+    ["Comment", repair.staff_comment ?? ""],
+    ["History", repair.history ?? ""],
+     ],
+   });
+
+   doc.setFontSize(10);
+
+   doc.text("CREDO Co.,Ltd.", 20, 270);
+   doc.text("TEL : 06-6422-7776", 20, 276);
+   doc.text("Staff : Masaya Ichiba", 20, 282);
+
+  
+  doc.save(`Repair_Report_${repair.property_name}_${repair.room_number}.pdf`);
+  }
   return (
     <main className="min-h-screen bg-gray-100 p-6">
       <div className="mx-auto max-w-5xl">
@@ -151,6 +229,12 @@ async function saveComment(id: number) {
                 >
                   コメント保存
                 </button>
+                <button
+                 onClick={() => createPdf(repair)}
+                 className="ml-2 mt-2 rounded bg-red-600 px-4 py-2 text-white"
+>
+                  📄 PDF作成
+               </button>
 
                <div className="mt-4 flex gap-2">
                <button
