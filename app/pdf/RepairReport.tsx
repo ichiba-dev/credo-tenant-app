@@ -8,10 +8,10 @@ import {
   Font,
 } from "@react-pdf/renderer";
 
-  Font.register({
+ Font.register({
   family: "NotoSansJP",
-  src: "/NotoSansJP-Regular.ttf",
-  });
+  src: window.location.origin + "/NotoSansJP-Regular.ttf",
+});
 
 const styles = StyleSheet.create({
   page: {

@@ -6,10 +6,6 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import "@/lib/NotoSansJP-Regular-normal";
 
-import { PDFDocument } from "pdf-lib";
-import fontkit from "@pdf-lib/fontkit";
-import { StandardFonts } from "pdf-lib";
-
 export default function AdminPage() {
   const [repairs, setRepairs] = useState<any[]>([]);
   const [comments, setComments] = useState<{ [key: number]: string }>({});
@@ -82,26 +78,8 @@ async function saveComment(id: number) {
   loadRepairs();
 }
   async function createPdf(repair: any) {
-    const pdfDoc = await PDFDocument.create();
-
-pdfDoc.registerFontkit(fontkit);
-
-const fontBytes = await fetch("/NotoSansJP-Regular.ttf")
-  .then((res) => res.arrayBuffer());
-
-const customFont = await pdfDoc.embedFont(fontBytes);
-const page = pdfDoc.addPage([595, 842]);
-
-page.drawText("修繕・不具合報告書", {
-  x: 50,
-  y: 800,
-  size: 24,
-  font: customFont,
-});
-const doc = new jsPDF();
-
-  doc.setFont("NotoSansJP-Regular", "normal");
-  doc.setFontSize(12);
+  const doc = new jsPDF();
+  doc.setFont("NotoSansJP-Regular-normal");
   
 
 
@@ -174,12 +152,7 @@ const doc = new jsPDF();
    doc.text("TEL : 06-6422-7776", 20, 276);
    doc.text("Staff : Masaya Ichiba", 20, 282);
 
-  const pdfBytes = await pdfDoc.save();
-
-  const blob = new Blob([pdfBytes], { type: "application/pdf" });
-
-  window.open(URL.createObjectURL(blob));
-
+  
   doc.save(`Repair_Report_${repair.property_name}_${repair.room_number}.pdf`);
   }
   return (
