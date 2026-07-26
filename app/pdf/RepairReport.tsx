@@ -20,38 +20,52 @@ const styles = StyleSheet.create({
     fontFamily: "NotoSansJP",
   },
 
-  header: {
-    backgroundColor: "#1E40AF",
-    padding: 15,
-  },
+   header: {
+    backgroundColor: "#0B2E59",
+    padding: 20,
+    alignItems: "center",
+    marginBottom: 20,
+   },
 
-  title: {
-    color: "white",
+   title: {
     fontSize: 22,
+    color: "#FFFFFF",
     fontWeight: "bold",
-  },
+   },
 
-  row: {
-  flexDirection: "row",
-  marginBottom: 8,
-  },
+   subTitle: {
+   fontSize: 15,
+   color: "#FFFFFF",
+   marginTop: 4,
+   },
 
-  label: {
+   jpTitle: {
+   fontSize: 10,
+   color: "#FFFFFF",
+   marginTop: 2,
+   },
+
+   row: {
+   flexDirection: "row",
+   marginBottom: 8,
+   },
+
+   label: {
    width: 80,
    fontWeight: "bold",
-  },
+   },
 
-  value: {
+   value: {
    flex: 1,
-  },
+   },
 
-  logo: {
-  width: 40,
-  height: 40,
-  marginBottom: 10,
-  },
+   logo: {
+   width: 40,
+   height: 40,
+   marginBottom: 10,
+   },
 
-  info: {
+   info: {
     fontSize: 12,
     marginBottom: 8,
    },
@@ -75,7 +89,28 @@ const styles = StyleSheet.create({
    marginBottom: 10,
    },
 
-});
+   section: {
+   marginTop: 20,
+   },
+
+   comment: {
+   fontSize: 11,
+   lineHeight: 20,
+   },
+  
+
+   infoBox: {
+   border: "1 solid #CFCFCF",
+   padding: 12,
+   marginBottom: 20,
+   },
+
+   infoTitle: {
+   fontSize: 13,
+   fontWeight: "bold",
+   marginBottom: 10,
+   },
+   });
 
 export default function RepairReport({ repair }: any) {
   return (
@@ -88,12 +123,23 @@ export default function RepairReport({ repair }: any) {
            style={styles.logo}
          />
 
-         <Text style={styles.title}>
-           CREDO Repair Report
-         </Text>
+       <Text style={styles.title}>
+        CREDO
+      </Text>
+
+      <Text style={styles.subTitle}>
+      Repair Report
+     </Text>
+
+      <Text style={styles.jpTitle}>
+       修繕・不具合報告書
+     </Text>
        </View>
 
-      <View style={{ marginTop: 20 }}>
+      <View style={styles.infoBox}>
+        <Text style={styles.infoTitle}>
+        ■物件情報
+      </Text>
 
       <View style={styles.row}>
         <Text style={styles.label}>物件名</Text>
@@ -117,11 +163,11 @@ export default function RepairReport({ repair }: any) {
      </View>
 
      <View style={styles.row}>
-      <Text style={styles.label}>受付日</Text>
-      <Text style={styles.value}>
-     {repair.created_at}
-     </Text>
-     </View>
+       <Text style={styles.label}>受付日</Text>
+       <Text style={styles.value}>
+        {new Date(repair.created_at).toLocaleDateString("ja-JP")}
+       </Text>
+      </View>
 
   </View>
 
@@ -135,6 +181,16 @@ export default function RepairReport({ repair }: any) {
 
        {repair.photo_url && (
          <>
+        <View style={styles.section}>
+         <Text style={styles.sectionTitle}>
+          担当者コメント
+         </Text>
+
+        <Text style={styles.comment}>
+         {repair.staff_comment || "コメントなし"}
+        </Text>
+       </View>
+
        <Text style={styles.photoTitle}>
           現場写真
        </Text>
@@ -146,15 +202,7 @@ export default function RepairReport({ repair }: any) {
       </>
        )}
 
-      <View style={styles.row}>
-         <Text style={styles.label}>
-          担当者コメント
-         </Text>
-
-        <Text style={styles.value}>
-        {repair.staff_comment}
-       </Text>
-     </View>
+       
 
       <View style={styles.row}>
         <Text style={styles.label}>

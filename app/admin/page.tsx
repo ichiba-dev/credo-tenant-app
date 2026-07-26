@@ -6,6 +6,9 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import "@/lib/NotoSansJP-Regular-normal";
 
+import { PDFDownloadLink } from "@react-pdf/renderer";
+import RepairReport from "@/app/pdf/RepairReport";
+
 import { PDFDocument } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import { StandardFonts } from "pdf-lib";
@@ -253,17 +256,25 @@ const doc = new jsPDF();
               />
 
                 <button
-                  onClick={() => saveComment(repair.id)}
-                  className="mt-2 rounded bg-gray-800 px-4 py-2 text-white"
-                >
-                  コメント保存
-                </button>
-                <button
-                 onClick={() => createPdf(repair)}
-                 className="ml-2 mt-2 rounded bg-red-600 px-4 py-2 text-white"
+                 onClick={() => saveComment(repair.id)}
+                 className="mt-2 rounded bg-gray-800 px-4 py-2 text-white"
 >
-                  📄 PDF作成
-               </button>
+                 コメント保存
+                 </button>
+
+                 <PDFDownloadLink
+                   document={<RepairReport repair={repair} />}
+                   fileName={`Repair_Report_${repair.property_name}_${repair.room_number}.pdf`}
+                  >
+
+                 {({ loading }) => (
+                 <button className="ml-2 mt-2 rounded bg-red-600 px-4 py-2 text-white">
+                {loading ? "PDF作成中..." : "📄 PDF作成"}
+                  </button>
+                 )}
+                 </PDFDownloadLink>
+               
+
 
                <div className="mt-4 flex gap-2">
                <button
