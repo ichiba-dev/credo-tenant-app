@@ -10,12 +10,12 @@ import {
 
  Font.register({
   family: "NotoSansJP",
-  src: window.location.origin + "/NotoSansJP-Regular.ttf",
+  src:"/NotoSansJP-Regular.ttf",
 });
 
 const styles = StyleSheet.create({
   page: {
-    padding: 30,
+    padding: 20,
     backgroundColor: "#ffffff",
     fontFamily: "NotoSansJP",
   },
@@ -60,8 +60,8 @@ const styles = StyleSheet.create({
    },
 
    logo: {
-   width: 40,
-   height: 40,
+   width: 45,
+   height: 45,
    marginBottom: 10,
    },
 
@@ -73,13 +73,15 @@ const styles = StyleSheet.create({
    sectionTitle: {
      fontSize: 14,
      fontWeight: "bold",
-     marginTop: 20,
-     marginBottom: 10,
+     marginTop: 12,
+     marginBottom: 6,
    },
+  
    photo: {
-   width: 300,
-   height: 200,
-   objectFit: "cover",
+    width: 360,
+    height: 230,
+    objectFit: "cover",
+    alignSelf: "center",
    },
 
    photoTitle: {
@@ -100,7 +102,10 @@ const styles = StyleSheet.create({
   
 
    infoBox: {
-   border: "1 solid #CFCFCF",
+   borderWidth: 1,
+   borderColor: "#CFCFCF",
+   borderStyle: "solid",
+   borderRadius: 4,
    padding: 12,
    marginBottom: 20,
    },
@@ -110,7 +115,22 @@ const styles = StyleSheet.create({
    fontWeight: "bold",
    marginBottom: 10,
    },
-   });
+
+   card: {
+   borderWidth: 1,
+   borderColor: "#D9D9D9",
+   borderStyle: "solid",
+   borderRadius: 4,
+   padding: 12,
+   marginBottom: 20,
+   },
+
+  cardText: {
+   fontSize: 11,
+   lineHeight: 18,
+  },
+
+  });
 
 export default function RepairReport({ repair }: any) {
   return (
@@ -171,25 +191,41 @@ export default function RepairReport({ repair }: any) {
 
   </View>
 
-       <Text style={styles.sectionTitle}>
-        修理内容
-       </Text>
+       <View style={styles.card} wrap={false}>
+        
+         <Text style={styles.infoTitle}>
+          ■修理内容
+         </Text>
 
-       <Text style={styles.info}>
+         <Text style={styles.cardText}>
          {repair.description}
-       </Text>
+        </Text>
 
-       {repair.photo_url && (
-         <>
-        <View style={styles.section}>
+        </View>
+
+       
+        
          <Text style={styles.sectionTitle}>
-          担当者コメント
+          ■担当者コメント
          </Text>
 
         <Text style={styles.comment}>
          {repair.staff_comment || "コメントなし"}
         </Text>
-       </View>
+
+      <View style={styles.row}>
+        <Text style={styles.label}>
+         ステータス
+      </Text>
+
+        <Text style={styles.value}>
+        {repair.status}
+        </Text>
+     </View>  
+
+      {repair.photo_url && (
+         <>  
+       
 
        <Text style={styles.photoTitle}>
           現場写真
@@ -204,15 +240,7 @@ export default function RepairReport({ repair }: any) {
 
        
 
-      <View style={styles.row}>
-        <Text style={styles.label}>
-         ステータス
-      </Text>
-
-        <Text style={styles.value}>
-        {repair.status}
-        </Text>
-     </View>
+      
 
       </Page>
     </Document>
