@@ -223,6 +223,20 @@ export default function RepairReport({ repair }: any) {
         </Text>
      </View>  
 
+     <View
+       style={{
+       marginTop: 30,
+       borderTopWidth: 1,
+       borderTopColor: "#CCCCCC",
+       paddingTop: 12,
+       alignItems: "center",
+      }}
+>
+      <Text>株式会社クレド</Text>
+      <Text>担当：市場 雅也</Text>
+      <Text>TEL：06-6427-9010</Text>
+     </View>
+
       {repair.photo_url && (
          <>  
        
