@@ -11,11 +11,12 @@ const [roomNumber, setRoomNumber] = useState("");
 const [tenantName, setTenantName] = useState("");
 const [category, setCategory] = useState("");
 const [description, setDescription] = useState("");
-const [photo, setPhoto] = useState<File | null>(null);
+const [photos, setPhotos] = useState<File[]>([]);
 const saveRepair = async () => {
-  let photoUrl = "";
+  const photoUrls: string[] = [];
 
-  if (photo) {
+  if (photos.length > 0) {
+  for (const photo of photos) {
     const fileName = `${Date.now()}-${photo.name}`;
 
     const { error: uploadError } = await supabase.storage
@@ -26,12 +27,14 @@ const saveRepair = async () => {
       alert(uploadError.message);
       return;
     }
-
-    const { data } = supabase.storage
+        const { data } = supabase.storage
       .from("repair-images")
       .getPublicUrl(fileName);
 
-    photoUrl = data.publicUrl;
+    photoUrls.push(data.publicUrl);
+   
+
+    }
   }
 
   const { error } = await supabase
@@ -43,7 +46,7 @@ const saveRepair = async () => {
         tenant_name: tenantName,
         category: category,
         description: description,
-        photo_url: photoUrl,
+        photo_url: photoUrls[0] ?? "",
         status: "受付",
       },
     ]);
@@ -167,16 +170,25 @@ const saveRepair = async () => {
               不具合箇所の写真を添付してください。
             </p>
 
-            <input
+
+           <input
               type="file"
               accept="image/*"
+              multiple
               onChange={(e) => {
-                if (e.target.files?.[0]) {
-                  setPhoto(e.target.files[0]);
-                }
+              if (e.target.files) {
+                  const files = Array.from(e.target.files);
+
+              if (files.length > 20) {
+                 alert("写真は20枚まで選択できます。");
+              return;
+              }
+
+              setPhotos(files);
+            }
               }}
-  className="w-full rounded-xl border border-dashed border-gray-300 p-4 text-sm text-gray-600"
-/>
+             className="w-full rounded-xl border border-dashed border-gray-300 p-4 text-sm text-gray-600"
+             />
           </div>
 
           <button
