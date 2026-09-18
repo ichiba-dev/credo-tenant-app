@@ -65,7 +65,8 @@ test('LINE dates fall back to created_at; merged conversations sort chronologica
 });
 test('viewer sees LINE badge, name and escaped body without IDs; staff reply UI remains', async () => {
   const MessageSection = load('./message-section.tsx', {
-    react: { useRef: () => ({ current: false }), useState: value => [value, () => {}], useTransition: () => [false, () => {}] },
+    react: { useEffect() {}, useRef: () => ({ current: false }), useState: value => [value, () => {}], useTransition: () => [false, () => {}] },
+    '@/lib/staff-reply-operation': {},
     'next/navigation': { useRouter: () => ({ refresh() {} }) }, './message-actions': { submitStaffMessage() {} },
   }).MessageSection;
   const messages = (await setup({ messages: [line({ message: '<script>本文</script>' })] }).get())[23];

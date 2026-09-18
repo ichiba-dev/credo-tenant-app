@@ -28,7 +28,7 @@ function getDisplayPhotos(repair: {
       : [];
 }
 
-export default function AdminRepairs({ repairs, canUpdate, children }: { repairs: AdminRepair[]; canUpdate: boolean; children?: ReactNode }) {
+export default function AdminRepairs({ repairs, canUpdate, children, replyScope }: { repairs: AdminRepair[]; canUpdate: boolean; children?: ReactNode; replyScope?: string }) {
   const router = useRouter();
   const [comments, setComments] = useState<{ [key: number]: string }>({});
   const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null);
@@ -150,7 +150,7 @@ export default function AdminRepairs({ repairs, canUpdate, children }: { repairs
               <p className="mt-2 font-bold">
                ステータス：{repair.status}
                </p>
-              <MessageSection repairId={repair.id} messages={repair.tenant_messages ?? []} canUpdate={canUpdate} lineUnavailable={repair.line_messages_unavailable} />
+              <MessageSection repairId={repair.id} messages={repair.tenant_messages ?? []} canUpdate={canUpdate} lineUnavailable={repair.line_messages_unavailable} replyScope={replyScope} />
                {repair.history && (
                 <div className="mt-2 rounded bg-gray-100 p-3 text-sm">
                 <p className="font-bold">📅 対応履歴</p>

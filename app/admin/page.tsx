@@ -34,7 +34,7 @@ export default async function AdminPage() {
   } catch {
     repairs = repairs.map(repair => ({ ...repair, line_messages_unavailable: true }));
   }
-  return <AdminRepairs key={context.organizationId} repairs={repairs} canUpdate={context.canUpdate}>
+  return <AdminRepairs key={context.organizationId} repairs={repairs} canUpdate={context.canUpdate} replyScope={`${context.organizationId}:${context.userId}`}>
     <LineMessageSection messages={lineMessages} unavailable={lineMessagesUnavailable} canUpdate={context.canUpdate} />
   </AdminRepairs>;
 }
