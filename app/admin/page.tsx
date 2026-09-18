@@ -7,6 +7,7 @@ import { getAdminTenantMessages } from "./message-data";
 import { getUnassignedLineMessages } from "./line-message-data";
 import LineMessageSection from "./line-message-section";
 import type { UnassignedLineMessage } from "./types";
+import { getLinkedLineMessages, mergeRepairMessages } from "./linked-line-message-data";
 
 export default async function AdminPage() {
   const context = await getStaffContext();
@@ -26,6 +27,12 @@ export default async function AdminPage() {
     repairs = repairs.map((repair) => ({ ...repair, owner_report_estimates: estimates[repair.id] ?? null, tenant_messages: messages[repair.id] ?? [] }));
   } catch {
     return <main className="p-6"><p role="alert">案件・写真・見積書を取得できませんでした。時間をおいて再読み込みしてください。</p></main>;
+  }
+  try {
+    const linked = await getLinkedLineMessages(context, repairs.map(repair => repair.id));
+    repairs = repairs.map(repair => ({ ...repair, tenant_messages: mergeRepairMessages(repair.tenant_messages, linked[repair.id] ?? []) }));
+  } catch {
+    repairs = repairs.map(repair => ({ ...repair, line_messages_unavailable: true }));
   }
   return <AdminRepairs key={context.organizationId} repairs={repairs} canUpdate={context.canUpdate}>
     <LineMessageSection messages={lineMessages} unavailable={lineMessagesUnavailable} canUpdate={context.canUpdate} />

@@ -51,9 +51,11 @@ export type AdminRepair = {
   photos_unavailable?: boolean;
   owner_report_estimates: OwnerReportEstimates | null;
   tenant_messages?: TenantRepairMessage[];
+  line_messages_unavailable?: boolean;
 };
 
 export type TenantRepairMessage = {
+  channel?: "line";
   id: string;
   sender_type: "tenant" | "staff";
   sender_name: string;

@@ -150,7 +150,7 @@ export default function AdminRepairs({ repairs, canUpdate, children }: { repairs
               <p className="mt-2 font-bold">
                ステータス：{repair.status}
                </p>
-              <MessageSection repairId={repair.id} messages={repair.tenant_messages ?? []} canUpdate={canUpdate} />
+              <MessageSection repairId={repair.id} messages={repair.tenant_messages ?? []} canUpdate={canUpdate} lineUnavailable={repair.line_messages_unavailable} />
                {repair.history && (
                 <div className="mt-2 rounded bg-gray-100 p-3 text-sm">
                 <p className="font-bold">📅 対応履歴</p>

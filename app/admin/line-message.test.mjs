@@ -101,16 +101,17 @@ test('LINE section renders empty and generic error states', () => {
   assert.ok(renderToStaticMarkup(jsx.jsx(Section, { messages: [], unavailable: false })).includes('未割当LINEメッセージはありません'));
   assert.ok(renderToStaticMarkup(jsx.jsx(Section, { messages: [], unavailable: true })).includes('LINEメッセージを取得できませんでした'));
 });
-function pageSetup({ authenticated = true, lineError = false } = {}) {
+function pageSetup({ authenticated = true, lineError = false, linkedError = false } = {}) {
   let lineCalls = 0; let repairCalls = 0;
   const context = authenticated ? { ok: true, organizationId: 'org-a', canUpdate: false } : { ok: false };
   const page = load('./page.tsx', {
     'next/navigation': { redirect(path) { throw new Error(`REDIRECT:${path}`); } },
     '@/lib/supabase-auth/staff': { getStaffContext: async () => context },
-    './data': { getAdminRepairs: async () => { repairCalls++; return []; } },
-    './admin-repairs': { default: ({ children, canUpdate }) => jsx.jsxs('main', { children: [jsx.jsx('p', { children: canUpdate ? 'edit' : '修理一覧閲覧' }), children] }) },
+    './data': { getAdminRepairs: async () => { repairCalls++; return [{ id: 23 }]; } },
+    './admin-repairs': { default: ({ children, canUpdate, repairs }) => jsx.jsxs('main', { children: [jsx.jsx('p', { children: canUpdate ? 'edit' : '修理一覧閲覧' }), ...repairs.flatMap(repair => repair.tenant_messages.map(item => jsx.jsx('p', { children: item.message }))), children] }) },
     './estimate-data': { getAdminEstimateData: async () => ({}) },
-    './message-data': { getAdminTenantMessages: async () => ({}) },
+    './message-data': { getAdminTenantMessages: async () => ({ 23: [{ id: 'existing', message: '既存会話維持' }] }) },
+    './linked-line-message-data': { getLinkedLineMessages: async () => { if (linkedError) throw new Error('DB_SECRET'); return {}; }, mergeRepairMessages: (existing) => existing },
     './line-message-data': { getUnassignedLineMessages: async (value) => { assert.equal(value, context); lineCalls++; if (lineError) throw new Error('DB_SECRET'); return [{ id: 'uuid', tenant_name: '入居者A', message: '本文', created_at: '2026-09-18T01:00:00Z' }]; } },
     './line-message-section': { default: Section },
   }).default;
@@ -133,4 +134,12 @@ test('LINE failure leaves repair list renderable and never exposes DB details', 
   assert.ok(html.includes('LINEメッセージを取得できませんでした'));
   assert.equal(html.includes('DB_SECRET'), false);
   assert.equal(s.calls().repairCalls, 1);
+});
+
+test('linked LINE failure preserves repair list and existing repair messages', async () => {
+  const s = pageSetup({ linkedError: true });
+  const html = renderToStaticMarkup(await s.page());
+  assert.ok(html.includes('修理一覧閲覧'));
+  assert.ok(html.includes('既存会話維持'));
+  assert.equal(html.includes('DB_SECRET'), false);
 });
