@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { saveLineTextMessages } from "@/lib/line-webhook";
+import { saveLineAttachments } from "@/lib/line-attachments";
 
 export const runtime = "nodejs";
 
@@ -78,6 +79,7 @@ export async function POST(request: Request) {
 
   try {
     await saveLineTextMessages(body.events);
+    await saveLineAttachments(body.events);
   } catch {
     return Response.json(
       { ok: false, message: "Webhook processing failed" },

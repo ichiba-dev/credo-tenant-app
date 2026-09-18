@@ -41,12 +41,15 @@ function setup(secret = SECRET, options = {}) {
     };
     return query;
   } };
+  const tenantExports = {};
+  vm.runInNewContext(ts.transpileModule(readFileSync(new URL("../../../../lib/line-tenant.ts", import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText, { exports: tenantExports, Date, require: () => ({}) });
   const helperExports = {};
   vm.runInNewContext(ts.transpileModule(readFileSync(new URL('../../../../lib/line-webhook.ts', import.meta.url), 'utf8'),
     { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText, {
     exports: helperExports, AbortSignal, Date, console: { info: (...args) => logs.push(args) },
     require(name) {
       if (name === 'server-only') return {};
+      if (name === './line-tenant') return tenantExports;
       assert.equal(name, '@/lib/supabase-server');
       return { createServerSupabaseClient: () => db };
     },
@@ -66,6 +69,7 @@ function setup(secret = SECRET, options = {}) {
     console: { info: (message) => logs.push(message) },
     require(name) {
       if (name === '@/lib/line-webhook') return helperExports;
+      if (name === '@/lib/line-attachments') return { saveLineAttachments: async () => { if (options.mediaFailure) throw new Error('private'); } };
       assert.equal(name, "node:crypto");
       return { createHmac, timingSafeEqual };
     },
@@ -101,6 +105,19 @@ test("an empty events array returns 200", async () => {
   const response = await route.post(signedRequest('{"events":[]}'));
   assert.equal(response.status, 200);
   assert.deepEqual(route.logs, ["LINE webhook received: 0 events"]);
+});
+
+test('media failure retains saved text; retry does not duplicate the text', async () => {
+  const route = setup(SECRET, { mediaFailure: true });
+  const body = JSON.stringify({ events: [
+    { type: 'message', source: { type: 'user', userId: 'U-sensitive' }, message: { type: 'text', id: 'mixed-text', text: 'private' } },
+    { type: 'message', source: { type: 'user', userId: 'U-sensitive' }, message: { type: 'image', id: 'mixed-image' } },
+  ] });
+  assert.equal((await route.post(signedRequest(body))).status, 500);
+  assert.equal(route.rows.size, 1);
+  assert.equal((await route.post(signedRequest(body))).status, 500);
+  assert.equal(route.rows.size, 1);
+  assert.equal(route.logs.length, 0);
 });
 
 test("an invalid or non-base64 signature returns 401", async () => {
