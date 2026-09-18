@@ -1,3 +1,10 @@
+export type UnassignedLineMessage = {
+  id: string;
+  tenant_name: string;
+  message: string;
+  created_at: string;
+};
+
 export type RepairPhoto = {
   repair_id: number;
   photo_url: string;

@@ -4,10 +4,20 @@ import { getAdminRepairs } from "./data";
 import AdminRepairs from "./admin-repairs";
 import { getAdminEstimateData } from "./estimate-data";
 import { getAdminTenantMessages } from "./message-data";
+import { getUnassignedLineMessages } from "./line-message-data";
+import LineMessageSection from "./line-message-section";
+import type { UnassignedLineMessage } from "./types";
 
 export default async function AdminPage() {
   const context = await getStaffContext();
   if (!context.ok) redirect("/admin/login");
+  let lineMessages: UnassignedLineMessage[] = [];
+  let lineMessagesUnavailable = false;
+  try {
+    lineMessages = await getUnassignedLineMessages(context);
+  } catch {
+    lineMessagesUnavailable = true;
+  }
   let repairs;
   try {
     repairs = await getAdminRepairs(context);
@@ -17,5 +27,7 @@ export default async function AdminPage() {
   } catch {
     return <main className="p-6"><p role="alert">案件・写真・見積書を取得できませんでした。時間をおいて再読み込みしてください。</p></main>;
   }
-  return <AdminRepairs key={context.organizationId} repairs={repairs} canUpdate={context.canUpdate} />;
+  return <AdminRepairs key={context.organizationId} repairs={repairs} canUpdate={context.canUpdate}>
+    <LineMessageSection messages={lineMessages} unavailable={lineMessagesUnavailable} />
+  </AdminRepairs>;
 }

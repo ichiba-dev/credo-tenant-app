@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { updateRepair } from "./actions";
 import type { AdminRepair, RepairPhoto } from "./types";
@@ -27,7 +28,7 @@ function getDisplayPhotos(repair: {
       : [];
 }
 
-export default function AdminRepairs({ repairs, canUpdate }: { repairs: AdminRepair[]; canUpdate: boolean }) {
+export default function AdminRepairs({ repairs, canUpdate, children }: { repairs: AdminRepair[]; canUpdate: boolean; children?: ReactNode }) {
   const router = useRouter();
   const [comments, setComments] = useState<{ [key: number]: string }>({});
   const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null);
@@ -79,6 +80,7 @@ export default function AdminRepairs({ repairs, canUpdate }: { repairs: AdminRep
   return (
     <main className="min-h-screen bg-gray-100 p-6">
       <div className="mx-auto max-w-5xl">
+        {children}
 
         <h1 className="text-3xl font-bold">
           修理依頼一覧
