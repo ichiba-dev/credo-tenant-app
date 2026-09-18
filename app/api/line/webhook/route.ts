@@ -1,35 +1,12 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { saveLineTextMessages } from "@/lib/line-webhook";
 
 export const runtime = "nodejs";
 
 const responseHeaders = { "Cache-Control": "no-store" };
 
-type LineEventSummary = {
-  type: string | undefined;
-  sourceType: string | undefined;
-  hasSourceUserId: boolean;
-  messageType: string | undefined;
-};
-
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-export function summarizeLineEvent(event: unknown): LineEventSummary {
-  const eventRecord = isRecord(event) ? event : undefined;
-  const source = isRecord(eventRecord?.source) ? eventRecord.source : undefined;
-  const message = isRecord(eventRecord?.message) ? eventRecord.message : undefined;
-  const type = typeof eventRecord?.type === "string" ? eventRecord.type : undefined;
-
-  return {
-    type,
-    sourceType: typeof source?.type === "string" ? source.type : undefined,
-    hasSourceUserId: typeof source?.userId === "string" && source.userId.length > 0,
-    messageType:
-      type === "message" && typeof message?.type === "string"
-        ? message.type
-        : undefined,
-  };
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function isValidSignature(rawBody: Buffer, signature: string, secret: string) {
@@ -99,9 +76,13 @@ export async function POST(request: Request) {
     );
   }
 
-  for (const event of body.events) {
-    // Keep classification local and deliberately do not log event payloads or user IDs.
-    summarizeLineEvent(event);
+  try {
+    await saveLineTextMessages(body.events);
+  } catch {
+    return Response.json(
+      { ok: false, message: "Webhook processing failed" },
+      { status: 500, headers: responseHeaders },
+    );
   }
 
   const eventLabel = body.events.length === 1 ? "event" : "events";
