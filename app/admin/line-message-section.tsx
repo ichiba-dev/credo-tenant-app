@@ -1,7 +1,8 @@
 import type { UnassignedLineMessage } from "./types";
+import LineMessageAssignment from "./line-message-assignment";
 
-export default function LineMessageSection({ messages, unavailable }: {
-  messages: UnassignedLineMessage[]; unavailable: boolean;
+export default function LineMessageSection({ messages, unavailable, canUpdate = false }: {
+  messages: UnassignedLineMessage[]; unavailable: boolean; canUpdate?: boolean;
 }) {
   return <section aria-labelledby="unassigned-line-heading" className="mb-8 rounded-xl bg-white p-6 shadow">
     <h2 id="unassigned-line-heading" className="text-xl font-bold text-[#0b2e59]">未割当LINEメッセージ</h2>
@@ -15,6 +16,7 @@ export default function LineMessageSection({ messages, unavailable }: {
           </div>
           <div className="mt-2 flex gap-2 text-xs"><span className="rounded-full bg-emerald-100 px-2 py-1 text-emerald-800">LINE</span><span className="rounded-full bg-amber-100 px-2 py-1 text-amber-800">未割当</span></div>
           <p className="mt-3 whitespace-pre-wrap break-words text-sm text-gray-800 [overflow-wrap:anywhere]">{item.message}</p>
+          {canUpdate && <LineMessageAssignment messageId={item.id} />}
         </li>)}</ol>}
   </section>;
 }

@@ -1,3 +1,13 @@
+export type LineRepairCandidate = {
+  id: number;
+  property_name: string | null;
+  room_number: string | null;
+  category: string | null;
+  description: string;
+  created_at: string;
+  status: string | null;
+};
+
 export type UnassignedLineMessage = {
   id: string;
   tenant_name: string;

@@ -28,6 +28,6 @@ export default async function AdminPage() {
     return <main className="p-6"><p role="alert">案件・写真・見積書を取得できませんでした。時間をおいて再読み込みしてください。</p></main>;
   }
   return <AdminRepairs key={context.organizationId} repairs={repairs} canUpdate={context.canUpdate}>
-    <LineMessageSection messages={lineMessages} unavailable={lineMessagesUnavailable} />
+    <LineMessageSection messages={lineMessages} unavailable={lineMessagesUnavailable} canUpdate={context.canUpdate} />
   </AdminRepairs>;
 }

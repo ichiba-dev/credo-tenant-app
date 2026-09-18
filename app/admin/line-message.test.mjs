@@ -89,7 +89,7 @@ test('LINE message and name lookup failures are generic', async () => {
   }
 });
 
-const Section = load('./line-message-section.tsx', {}).default;
+const Section = load('./line-message-section.tsx', { './line-message-assignment': { default: () => jsx.jsx('button', { children: '修理依頼に紐づける' }) } }).default;
 test('LINE cards render names, JST received time, badges and escaped text without internal IDs or actions', () => {
   const html = renderToStaticMarkup(jsx.jsx(Section, { unavailable: false, messages: [{ id: 'internal-uuid', tenant_name: '入居者A',
     message: '<script>alert(1)</script>\n本文', created_at: '2026-09-18T01:00:00Z' }] }));
