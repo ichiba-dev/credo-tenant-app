@@ -101,7 +101,7 @@ test('LINE section renders empty and generic error states', () => {
   assert.ok(renderToStaticMarkup(jsx.jsx(Section, { messages: [], unavailable: false })).includes('未割当LINEメッセージはありません'));
   assert.ok(renderToStaticMarkup(jsx.jsx(Section, { messages: [], unavailable: true })).includes('LINEメッセージを取得できませんでした'));
 });
-function pageSetup({ authenticated = true, lineError = false, linkedError = false } = {}) {
+function pageSetup({ authenticated = true, lineError = false, linkedError = false, attachmentError = false } = {}) {
   let lineCalls = 0; let repairCalls = 0;
   const context = authenticated ? { ok: true, organizationId: 'org-a', canUpdate: false } : { ok: false };
   const page = load('./page.tsx', {
@@ -114,6 +114,8 @@ function pageSetup({ authenticated = true, lineError = false, linkedError = fals
     './linked-line-message-data': { getLinkedLineMessages: async () => { if (linkedError) throw new Error('DB_SECRET'); return {}; }, mergeRepairMessages: (existing) => existing },
     './line-message-data': { getUnassignedLineMessages: async (value) => { assert.equal(value, context); lineCalls++; if (lineError) throw new Error('DB_SECRET'); return [{ id: 'uuid', tenant_name: '入居者A', message: '本文', created_at: '2026-09-18T01:00:00Z' }]; } },
     './line-message-section': { default: Section },
+    './line-attachment-data': { getUnassignedLineAttachments: async () => { if (attachmentError) throw new Error('DB_SECRET'); return []; } },
+    './line-attachment-section': { default: ({ unavailable }) => unavailable ? jsx.jsx('p', { children: 'LINE添付を取得できませんでした' }) : null },
   }).default;
   return { page, calls: () => ({ lineCalls, repairCalls }) };
 }
@@ -141,5 +143,11 @@ test('linked LINE failure preserves repair list and existing repair messages', a
   const html = renderToStaticMarkup(await s.page());
   assert.ok(html.includes('修理一覧閲覧'));
   assert.ok(html.includes('既存会話維持'));
+  assert.equal(html.includes('DB_SECRET'), false);
+});
+
+test('attachment failure preserves repair list, existing conversations and unassigned text', async () => {
+  const html = renderToStaticMarkup(await pageSetup({ attachmentError: true }).page());
+  for (const text of ['修理一覧閲覧', '既存会話維持', '本文', 'LINE添付を取得できませんでした']) assert.ok(html.includes(text));
   assert.equal(html.includes('DB_SECRET'), false);
 });

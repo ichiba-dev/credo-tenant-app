@@ -8,10 +8,17 @@ import { getUnassignedLineMessages } from "./line-message-data";
 import LineMessageSection from "./line-message-section";
 import type { UnassignedLineMessage } from "./types";
 import { getLinkedLineMessages, mergeRepairMessages } from "./linked-line-message-data";
+import { getUnassignedLineAttachments } from "./line-attachment-data";
+import LineAttachmentSection from "./line-attachment-section";
+import type { UnassignedLineAttachment } from "./types";
 
 export default async function AdminPage() {
   const context = await getStaffContext();
   if (!context.ok) redirect("/admin/login");
+  let attachments: UnassignedLineAttachment[] = [];
+  let attachmentsUnavailable = false;
+  try { attachments = await getUnassignedLineAttachments(context); }
+  catch { attachmentsUnavailable = true; }
   let lineMessages: UnassignedLineMessage[] = [];
   let lineMessagesUnavailable = false;
   try {
@@ -36,5 +43,6 @@ export default async function AdminPage() {
   }
   return <AdminRepairs key={context.organizationId} repairs={repairs} canUpdate={context.canUpdate} replyScope={`${context.organizationId}:${context.userId}`}>
     <LineMessageSection messages={lineMessages} unavailable={lineMessagesUnavailable} canUpdate={context.canUpdate} />
+    <LineAttachmentSection attachments={attachments} unavailable={attachmentsUnavailable} canUpdate={context.canUpdate} />
   </AdminRepairs>;
 }

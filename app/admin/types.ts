@@ -1,3 +1,12 @@
+export type UnassignedLineAttachment = {
+  id: string;
+  tenant_name: string;
+  media_type: "image" | "pdf";
+  original_filename: string | null;
+  file_size: number;
+  created_at: string;
+};
+
 export type LineRepairCandidate = {
   id: number;
   property_name: string | null;
