@@ -11,12 +11,12 @@ export default function MessageAttachment({ attachment, repairId }: { attachment
     return <a href={url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block" aria-label="画像を拡大して開く">
       {/* Reauthorize each request instead of caching private images with the image optimizer. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={url} alt="入居者からのLINE添付画像" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} className="max-h-48 max-w-full rounded-lg object-contain" />
+      <img src={url} alt="入居者からのLINE添付画像" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} className="max-h-60 max-w-full md:max-h-80 rounded-lg object-contain" />
     </a>;
   }
-  return <div className="mt-2">
+  return <div className="mt-3 space-y-3 py-2">
     <p className="break-words [overflow-wrap:anywhere]">{attachment.original_filename || "PDFファイル"}</p>
-    <p className="mt-1 text-xs text-gray-500">{(attachment.file_size / 1_000_000).toFixed(2)} MB</p>
-    <a href={url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block font-bold text-[#0b2e59] underline">PDFを開く</a>
+    <p className="text-xs text-gray-500">{(attachment.file_size / 1_000_000).toFixed(2)} MB</p>
+    <a href={url} target="_blank" rel="noopener noreferrer" className="inline-block py-1 font-bold text-[#0b2e59] underline">PDFを開く</a>
   </div>;
 }
