@@ -61,9 +61,11 @@ export type AdminRepair = {
   owner_report_estimates: OwnerReportEstimates | null;
   tenant_messages?: TenantRepairMessage[];
   line_messages_unavailable?: boolean;
+  line_attachments_unavailable?: boolean;
 };
 
 export type TenantRepairMessage = {
+  attachment?: { id: string; media_type: "image" | "pdf"; original_filename: string | null; file_size: number };
   channel?: "line";
   id: string;
   sender_type: "tenant" | "staff";

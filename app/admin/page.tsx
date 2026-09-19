@@ -11,6 +11,7 @@ import { getLinkedLineMessages, mergeRepairMessages } from "./linked-line-messag
 import { getUnassignedLineAttachments } from "./line-attachment-data";
 import LineAttachmentSection from "./line-attachment-section";
 import type { UnassignedLineAttachment } from "./types";
+import { getLinkedLineAttachments } from "./linked-line-attachment-data";
 
 export default async function AdminPage() {
   const context = await getStaffContext();
@@ -40,6 +41,12 @@ export default async function AdminPage() {
     repairs = repairs.map(repair => ({ ...repair, tenant_messages: mergeRepairMessages(repair.tenant_messages, linked[repair.id] ?? []) }));
   } catch {
     repairs = repairs.map(repair => ({ ...repair, line_messages_unavailable: true }));
+  }
+  try {
+    const linkedAttachments = await getLinkedLineAttachments(context, repairs.map(repair => repair.id));
+    repairs = repairs.map(repair => ({ ...repair, tenant_messages: mergeRepairMessages(repair.tenant_messages, linkedAttachments[repair.id] ?? []) }));
+  } catch {
+    repairs = repairs.map(repair => ({ ...repair, line_attachments_unavailable: true }));
   }
   return <AdminRepairs key={context.organizationId} repairs={repairs} canUpdate={context.canUpdate} replyScope={`${context.organizationId}:${context.userId}`}>
     <LineMessageSection messages={lineMessages} unavailable={lineMessagesUnavailable} canUpdate={context.canUpdate} />

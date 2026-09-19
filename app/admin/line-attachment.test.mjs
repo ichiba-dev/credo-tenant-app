@@ -29,7 +29,7 @@ function setup({ files = [file()], role = 'viewer', auth = true, failTable, fail
         return Promise.resolve(table === failTable ? { error: { message: 'PRIVATE_DETAIL' }, data: null } : { data: q.single ? rows[0] ?? null : rows }).then(resolve, reject);
       } }; return b;
   }, storage: { from: name => ({ createSignedUrl: async (path, ttl) => { signs.push({ name, path, ttl }); return failSign ? { error: { message: 'PRIVATE_DETAIL' } } : { data: { signedUrl: 'https://private.example/signed' } }; } }) } };
-  const imports = { '@/lib/supabase-server': { createServerSupabaseClient: () => db }, '@/lib/supabase-auth/staff': { getStaffContext: async () => auth ? { ok: true, organizationId: org, canUpdate: role !== 'viewer' } : { ok: false, reason: 'unauthenticated' } },
+  const imports = { '@/lib/repair-id': load('../../lib/repair-id.ts', {}), '@/lib/supabase-server': { createServerSupabaseClient: () => db }, '@/lib/supabase-auth/staff': { getStaffContext: async () => auth ? { ok: true, organizationId: org, canUpdate: role !== 'viewer' } : { ok: false, reason: 'unauthenticated' } },
     '@/lib/line-attachment-access': load('../../lib/line-attachment-access.ts', {}) };
   const route = load('../api/admin/line-attachments/[fileId]/open/route.ts', imports);
   return { calls, signs, list: () => load('./line-attachment-data.ts', imports).getUnassignedLineAttachments({ ok: true, organizationId: org, canUpdate: false }),
