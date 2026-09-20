@@ -65,7 +65,7 @@ export type AdminRepair = {
 };
 
 export type TenantRepairMessage = {
-  attachment?: { id: string; media_type: "image" | "pdf"; original_filename: string | null; file_size: number };
+  attachment?: { id: string; media_type: "image" | "pdf"; original_filename: string | null; file_size: number; outbound?: boolean };
   channel?: "line";
   id: string;
   sender_type: "tenant" | "staff";

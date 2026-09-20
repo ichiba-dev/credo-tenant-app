@@ -12,6 +12,7 @@ import { getUnassignedLineAttachments } from "./line-attachment-data";
 import LineAttachmentSection from "./line-attachment-section";
 import type { UnassignedLineAttachment } from "./types";
 import { getLinkedLineAttachments } from "./linked-line-attachment-data";
+import { getOutboundAttachments } from "./outbound-attachment-data";
 
 export default async function AdminPage() {
   const context = await getStaffContext();
@@ -45,6 +46,12 @@ export default async function AdminPage() {
   try {
     const linkedAttachments = await getLinkedLineAttachments(context, repairs.map(repair => repair.id));
     repairs = repairs.map(repair => ({ ...repair, tenant_messages: mergeRepairMessages(repair.tenant_messages, linkedAttachments[repair.id] ?? []) }));
+  } catch {
+    repairs = repairs.map(repair => ({ ...repair, line_attachments_unavailable: true }));
+  }
+  try {
+    const outbound = await getOutboundAttachments(context.organizationId, repairs.map(repair => repair.id));
+    repairs = repairs.map(repair => ({ ...repair, tenant_messages: mergeRepairMessages(repair.tenant_messages, outbound[repair.id] ?? []) }));
   } catch {
     repairs = repairs.map(repair => ({ ...repair, line_attachments_unavailable: true }));
   }

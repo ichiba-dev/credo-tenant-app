@@ -115,6 +115,7 @@ function pageSetup({ authenticated = true, lineError = false, linkedError = fals
     './line-message-data': { getUnassignedLineMessages: async (value) => { assert.equal(value, context); lineCalls++; if (lineError) throw new Error('DB_SECRET'); return [{ id: 'uuid', tenant_name: '入居者A', message: '本文', created_at: '2026-09-18T01:00:00Z' }]; } },
     './line-message-section': { default: Section },
     './linked-line-attachment-data': { getLinkedLineAttachments: async () => ({}) },
+    './outbound-attachment-data': { getOutboundAttachments: async () => ({}) },
     './line-attachment-data': { getUnassignedLineAttachments: async () => { if (attachmentError) throw new Error('DB_SECRET'); return []; } },
     './line-attachment-section': { default: ({ unavailable }) => unavailable ? jsx.jsx('p', { children: 'LINE添付を取得できませんでした' }) : null },
   }).default;

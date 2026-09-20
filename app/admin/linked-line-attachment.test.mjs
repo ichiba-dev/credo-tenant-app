@@ -73,6 +73,7 @@ test('wrong repair, omitted/invalid/duplicate repair, foreign org, path mismatch
 const hooks = { useState: value => [value, () => {}], useEffect() {}, useRef: () => ({ current: false }), useTransition: () => [false, () => {}] };
 function sectionImports(react = hooks) {
   return { react, './message-attachment': { default: load('./message-attachment.tsx', { react }).default },
+    './outbound-attachment-form': { OutboundAttachmentForm: () => null },
     'next/navigation': { useRouter: () => ({ refresh() {} }) }, './message-actions': {}, '@/lib/staff-reply-operation': {} };
 }
 test('conversation renders white image/PDF cards, labels, escaped filename and scoped links; viewer cannot reply', async () => {
@@ -107,6 +108,7 @@ test('page isolates attachment load failure and keeps repair and both text conve
       './message-data': { getAdminTenantMessages: async () => ({ 23: [{ id: 'web', message: '既存会話', created_at: file().created_at }] }) },
       './linked-line-message-data': { mergeRepairMessages, getLinkedLineMessages: async () => ({ 23: [{ id: 'line:text', message: 'LINE本文', channel: 'line', created_at: file().created_at }] }) },
       './linked-line-attachment-data': { getLinkedLineAttachments: async () => { if (fail) throw new Error('PRIVATE_DETAIL'); return setup().list(); } },
+      './outbound-attachment-data': { getOutboundAttachments: async () => ({}) },
       './line-message-data': { getUnassignedLineMessages: async () => [] }, './line-message-section': { default: () => null },
       './line-attachment-data': { getUnassignedLineAttachments: async () => [] }, './line-attachment-section': { default: () => null },
       './admin-repairs': { default: ({ repairs }) => jsx.jsxs('main', { children: ['修理一覧', ...repairs.map(repair => jsx.jsx(Section, { repairId: repair.id, messages: repair.tenant_messages, canUpdate: false, attachmentsUnavailable: repair.line_attachments_unavailable }))] }) },

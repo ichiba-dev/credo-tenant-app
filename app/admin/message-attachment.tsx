@@ -5,7 +5,9 @@ import type { TenantRepairMessage } from "./types";
 
 export default function MessageAttachment({ attachment, repairId }: { attachment: NonNullable<TenantRepairMessage["attachment"]>; repairId: number }) {
   const [failed, setFailed] = useState(false);
-  const url = `/api/admin/line-attachments/${encodeURIComponent(attachment.id)}/open?repairId=${repairId}`;
+  const url = attachment.outbound
+    ? `/api/admin/outbound-attachments/${encodeURIComponent(attachment.id)}/open?repairId=${repairId}`
+    : `/api/admin/line-attachments/${encodeURIComponent(attachment.id)}/open?repairId=${repairId}`;
   if (attachment.media_type === "image") {
     if (failed) return <p role="alert" className="mt-2 text-sm text-red-700">画像を表示できません</p>;
     return <a href={url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block" aria-label="画像を拡大して開く">
