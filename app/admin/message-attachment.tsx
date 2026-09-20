@@ -19,6 +19,6 @@ export default function MessageAttachment({ attachment, repairId }: { attachment
   return <div className="mt-3 space-y-3 py-2">
     <p className="break-words [overflow-wrap:anywhere]">{attachment.original_filename || "PDFファイル"}</p>
     <p className="text-xs text-gray-500">{(attachment.file_size / 1_000_000).toFixed(2)} MB</p>
-    <a href={url} target="_blank" rel="noopener noreferrer" className="inline-block py-1 font-bold text-[#0b2e59] underline">PDFを開く</a>
+    <a href={url} target="_blank" rel="noopener noreferrer" className={`inline-block py-1 font-bold underline ${attachment.outbound ? "text-white" : "text-[#0b2e59]"}`}>PDFを開く</a>
   </div>;
 }

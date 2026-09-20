@@ -87,6 +87,21 @@ test('conversation renders white image/PDF cards, labels, escaped filename and s
   }
 });
 
+test('staff outbound PDF link is visible to viewers and keeps the admin repair scope', () => {
+  const Section = load('./message-section.tsx', sectionImports()).MessageSection;
+  const outbound = { id, sender_type: 'staff', sender_name: '管理会社', channel: 'line', message: '',
+    created_at: '2026-09-18T00:00:00Z', attachment: { id, media_type: 'pdf', original_filename: 'sent.pdf', file_size: 5_800_000, outbound: true } };
+  const incoming = { ...outbound, id: 'incoming', sender_type: 'tenant',
+    attachment: { ...outbound.attachment, outbound: false } };
+  for (const canUpdate of [false, true]) {
+    const html = renderToStaticMarkup(jsx.jsx(Section, { repairId: 23, messages: [outbound, incoming], canUpdate }));
+    assert.match(html, /href="\/api\/admin\/outbound-attachments\/33333333-3333-4333-8333-333333333333\/open\?repairId=23"[^>]*class="[^"]*text-white[^"]*"[^>]*>PDFを開く<\/a>/);
+    assert.match(html, /href="\/api\/admin\/line-attachments\/33333333-3333-4333-8333-333333333333\/open\?repairId=23"[^>]*class="[^"]*text-\[#0b2e59\][^"]*"[^>]*>PDFを開く<\/a>/);
+    assert.equal(html.includes('/api/line-outbound/pdf/'), false);
+    assert.equal(html.includes('staff-reply-23'), canUpdate);
+  }
+});
+
 test('signing failure leaves data available and image error changes only that attachment', async () => {
   const s = setup({ failSign: true }); assert.equal((await s.open()).status, 503); assert.equal((await s.list())[23].length, 1);
   let failed = false;
