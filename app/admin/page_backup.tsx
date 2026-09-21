@@ -6,8 +6,22 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import "@/lib/NotoSansJP-Regular-normal";
 
+type BackupRepair = {
+  id: number;
+  created_at: string;
+  property_name: string | null;
+  room_number: string | null;
+  tenant_name: string | null;
+  category: string | null;
+  description: string | null;
+  status: string | null;
+  history: string | null;
+  staff_comment: string | null;
+  photo_url: string | null;
+};
+
 export default function AdminPage() {
-  const [repairs, setRepairs] = useState<any[]>([]);
+  const [repairs, setRepairs] = useState<BackupRepair[]>([]);
   const [comments, setComments] = useState<{ [key: number]: string }>({});
   useEffect(() => {
   loadRepairs();
@@ -77,7 +91,7 @@ async function saveComment(id: number) {
 
   loadRepairs();
 }
-  async function createPdf(repair: any) {
+  async function createPdf(repair: BackupRepair) {
   const doc = new jsPDF();
   doc.setFont("NotoSansJP-Regular-normal");
   

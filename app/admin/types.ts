@@ -62,6 +62,7 @@ export type AdminRepair = {
   tenant_messages?: TenantRepairMessage[];
   line_messages_unavailable?: boolean;
   line_attachments_unavailable?: boolean;
+  vendor_dispatches?: { id: string; status: string; vendor_name: string }[];
 };
 
 export type TenantRepairMessage = {

@@ -10,6 +10,8 @@ import { refreshRepairPhotos } from "./photo-actions";
 import RepairImage from "@/app/components/repair-image";
 import EstimateSection from "./estimate-section";
 import { MessageSection } from "./message-section";
+import { VendorQuoteUploadForm } from "./vendor-quote-upload-form";
+import Link from "next/link";
 
 function getDisplayPhotos(repair: {
   photo_url?: string | null;
@@ -80,6 +82,9 @@ export default function AdminRepairs({ repairs, canUpdate, children, replyScope 
   return (
     <main className="min-h-screen bg-gray-100 p-6">
       <div className="mx-auto max-w-5xl">
+        <nav className="mb-5 flex justify-end">
+          <Link href="/admin/vendors" className="rounded-lg bg-blue-950 px-4 py-2 font-bold text-white shadow hover:bg-blue-900">業者マスタ</Link>
+        </nav>
         {children}
 
         <h1 className="text-3xl font-bold">
@@ -151,6 +156,9 @@ export default function AdminRepairs({ repairs, canUpdate, children, replyScope 
                ステータス：{repair.status}
                </p>
               <MessageSection repairId={repair.id} messages={repair.tenant_messages ?? []} canUpdate={canUpdate} lineUnavailable={repair.line_messages_unavailable} attachmentsUnavailable={repair.line_attachments_unavailable} replyScope={replyScope} />
+              {canUpdate && repair.vendor_dispatches?.filter((dispatch) =>
+                !["candidate","cancelled"].includes(dispatch.status)).map((dispatch) =>
+                <VendorQuoteUploadForm key={dispatch.id} repairId={repair.id} dispatchId={dispatch.id} />)}
                {repair.history && (
                 <div className="mt-2 rounded bg-gray-100 p-3 text-sm">
                 <p className="font-bold">📅 対応履歴</p>
