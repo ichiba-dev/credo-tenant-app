@@ -12,6 +12,7 @@ import EstimateSection from "./estimate-section";
 import { MessageSection } from "./message-section";
 import { VendorQuoteUploadForm } from "./vendor-quote-upload-form";
 import Link from "next/link";
+import { VendorDispatchSection } from "./vendor-dispatch-section";
 
 function getDisplayPhotos(repair: {
   photo_url?: string | null;
@@ -156,6 +157,14 @@ export default function AdminRepairs({ repairs, canUpdate, children, replyScope 
                ステータス：{repair.status}
                </p>
               <MessageSection repairId={repair.id} messages={repair.tenant_messages ?? []} canUpdate={canUpdate} lineUnavailable={repair.line_messages_unavailable} attachmentsUnavailable={repair.line_attachments_unavailable} replyScope={replyScope} />
+              <VendorDispatchSection repairId={repair.id} candidates={repair.vendor_candidates ?? []}
+                dispatches={repair.vendor_dispatches ?? []} canUpdate={canUpdate}
+                unavailable={repair.vendor_dispatch_unavailable}
+                suggestedInstructions={`${repair.property_name} ${repair.room_number}号室\n${repair.description}\n現地確認と修理見積をお願いします。`}
+                propertyName={repair.property_name} roomNumber={repair.room_number}
+                repairCategory={repair.category} repairDescription={repair.description}
+                photoCount={(repair.repair_photos?.length ?? 0) || (repair.photo_url ? 1 : 0)}
+                managementCompanyName="株式会社CREDO" />
               {canUpdate && repair.vendor_dispatches?.filter((dispatch) =>
                 !["candidate","cancelled"].includes(dispatch.status)).map((dispatch) =>
                 <VendorQuoteUploadForm key={dispatch.id} repairId={repair.id} dispatchId={dispatch.id} />)}

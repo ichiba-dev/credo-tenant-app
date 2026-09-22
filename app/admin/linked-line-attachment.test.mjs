@@ -124,6 +124,7 @@ test('page isolates attachment load failure and keeps repair and both text conve
       './linked-line-message-data': { mergeRepairMessages, getLinkedLineMessages: async () => ({ 23: [{ id: 'line:text', message: 'LINE本文', channel: 'line', created_at: file().created_at }] }) },
       './linked-line-attachment-data': { getLinkedLineAttachments: async () => { if (fail) throw new Error('PRIVATE_DETAIL'); return setup().list(); } },
       './outbound-attachment-data': { getOutboundAttachments: async () => ({}) },
+      './vendor-dispatch-data': { getVendorDispatchData: async () => ({ candidates: [], byRepair: { 23: [] } }) },
       './line-message-data': { getUnassignedLineMessages: async () => [] }, './line-message-section': { default: () => null },
       './line-attachment-data': { getUnassignedLineAttachments: async () => [] }, './line-attachment-section': { default: () => null },
       './admin-repairs': { default: ({ repairs }) => jsx.jsxs('main', { children: ['修理一覧', ...repairs.map(repair => jsx.jsx(Section, { repairId: repair.id, messages: repair.tenant_messages, canUpdate: false, attachmentsUnavailable: repair.line_attachments_unavailable }))] }) },

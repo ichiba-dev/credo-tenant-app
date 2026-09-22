@@ -13,6 +13,7 @@ import LineAttachmentSection from "./line-attachment-section";
 import type { UnassignedLineAttachment } from "./types";
 import { getLinkedLineAttachments } from "./linked-line-attachment-data";
 import { getOutboundAttachments } from "./outbound-attachment-data";
+import { getVendorDispatchData } from "./vendor-dispatch-data";
 
 export default async function AdminPage() {
   const context = await getStaffContext();
@@ -55,24 +56,15 @@ export default async function AdminPage() {
   } catch {
     repairs = repairs.map(repair => ({ ...repair, line_attachments_unavailable: true }));
   }
-  // The table is introduced by the pending vendor migration. Until then the
-  // existing admin page remains available without a vendor section.
   try {
-    const { data, error } = await context.supabase.from("repair_vendor_dispatches")
-      .select("id,repair_request_id,status,repair_vendors(company_name)")
-      .eq("organization_id",context.organizationId)
-      .in("repair_request_id",repairs.map(repair => repair.id));
-    if (!error && data) {
-      const byRepair = new Map<number,{id:string;status:string;vendor_name:string}[]>();
-      for (const row of data) {
-        const vendor = Array.isArray(row.repair_vendors) ? row.repair_vendors[0] : row.repair_vendors;
-        const list = byRepair.get(row.repair_request_id) ?? [];
-        list.push({id:row.id,status:row.status,vendor_name:vendor?.company_name ?? "業者"});
-        byRepair.set(row.repair_request_id,list);
-      }
-      repairs = repairs.map(repair => ({...repair,vendor_dispatches:byRepair.get(repair.id) ?? []}));
-    }
-  } catch { /* Vendor migration is not installed yet. */ }
+    const vendorData = await getVendorDispatchData(context, repairs.map((repair) => repair.id));
+    repairs = repairs.map((repair) => ({ ...repair,
+      vendor_dispatches: vendorData.byRepair[repair.id] ?? [],
+      vendor_candidates: vendorData.candidates,
+    }));
+  } catch {
+    repairs = repairs.map((repair) => ({ ...repair, vendor_dispatch_unavailable: true }));
+  }
   return <AdminRepairs key={context.organizationId} repairs={repairs} canUpdate={context.canUpdate} replyScope={`${context.organizationId}:${context.userId}`}>
     <LineMessageSection messages={lineMessages} unavailable={lineMessagesUnavailable} canUpdate={context.canUpdate} />
     <LineAttachmentSection attachments={attachments} unavailable={attachmentsUnavailable} canUpdate={context.canUpdate} />

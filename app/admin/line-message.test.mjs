@@ -116,6 +116,7 @@ function pageSetup({ authenticated = true, lineError = false, linkedError = fals
     './line-message-section': { default: Section },
     './linked-line-attachment-data': { getLinkedLineAttachments: async () => ({}) },
     './outbound-attachment-data': { getOutboundAttachments: async () => ({}) },
+    './vendor-dispatch-data': { getVendorDispatchData: async () => ({ candidates: [], byRepair: { 23: [] } }) },
     './line-attachment-data': { getUnassignedLineAttachments: async () => { if (attachmentError) throw new Error('DB_SECRET'); return []; } },
     './line-attachment-section': { default: ({ unavailable }) => unavailable ? jsx.jsx('p', { children: 'LINE添付を取得できませんでした' }) : null },
   }).default;

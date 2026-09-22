@@ -44,6 +44,52 @@ export type OwnerReportEstimates = {
   unavailable?: boolean;
 };
 
+export type VendorCandidate = {
+  id: string;
+  companyName: string;
+  contactName: string;
+  phone: string | null;
+  email: string | null;
+  categories: string[];
+  areas: { areaCode: string; areaLabel: string }[];
+};
+
+export type VendorDispatchMessage = {
+  id: string;
+  channel: string;
+  messageBody: string;
+  recipientLabel: string;
+  recipientAddress: string | null;
+  deliveryStatus: string;
+  sentAt: string | null;
+  sentByName: string;
+};
+
+export type VendorDispatchEvent = {
+  id: string;
+  eventType: string;
+  fromStatus: string | null;
+  toStatus: string | null;
+  note: string | null;
+  occurredAt: string;
+  actorName: string;
+};
+
+export type VendorDispatchHistory = {
+  id: string;
+  vendorId: string;
+  vendorName: string;
+  vendorContactName: string;
+  vendorPhone: string | null;
+  vendorEmail: string | null;
+  status: string;
+  instructions: string;
+  selectedAt: string;
+  assignedByName: string;
+  events: VendorDispatchEvent[];
+  messages: VendorDispatchMessage[];
+};
+
 export type AdminRepair = {
   id: number;
   property_name: string;
@@ -62,7 +108,9 @@ export type AdminRepair = {
   tenant_messages?: TenantRepairMessage[];
   line_messages_unavailable?: boolean;
   line_attachments_unavailable?: boolean;
-  vendor_dispatches?: { id: string; status: string; vendor_name: string }[];
+  vendor_dispatches?: VendorDispatchHistory[];
+  vendor_candidates?: VendorCandidate[];
+  vendor_dispatch_unavailable?: boolean;
 };
 
 export type TenantRepairMessage = {
