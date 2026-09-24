@@ -111,7 +111,7 @@ export async function confirmManualVendorDispatch(input: unknown): Promise<Confi
     const recipientLabel = `${vendor.company_name} ${vendor.contact_name}`.trim();
     const recipientAddress = [vendor.phone, vendor.email].filter((value): value is string =>
       typeof value === "string" && value.trim().length > 0).join(" / ") || null;
-    const { data, error } = await createServerSupabaseClient().rpc("confirm_vendor_dispatch_manual", {
+    const { data, error } = await createServerSupabaseClient().rpc("confirm_vendor_dispatch_manual_v2", {
       p_org: context.organizationId,
       p_dispatch: parsed.dispatchId,
       p_actor: context.userId,
@@ -119,6 +119,8 @@ export async function confirmManualVendorDispatch(input: unknown): Promise<Confi
       p_message_body: parsed.messageBody,
       p_recipient_label: recipientLabel,
       p_recipient_address: recipientAddress,
+      p_photos: parsed.photos.map((photo) => ({ source_type: photo.sourceType,
+        source_id: photo.sourceId })),
     });
     const row = Array.isArray(data) ? data[0] : data;
     const conflict = error?.message?.includes("VENDOR_DISPATCH_MESSAGE_REQUEST_CONFLICT") ||

@@ -160,10 +160,11 @@ export default function AdminRepairs({ repairs, canUpdate, children, replyScope 
               <VendorDispatchSection repairId={repair.id} candidates={repair.vendor_candidates ?? []}
                 dispatches={repair.vendor_dispatches ?? []} canUpdate={canUpdate}
                 unavailable={repair.vendor_dispatch_unavailable}
-                suggestedInstructions={`${repair.property_name} ${repair.room_number}号室\n${repair.description}\n現地確認と修理見積をお願いします。`}
+                suggestedInstructions="現地確認と修理見積をお願いします。"
                 propertyName={repair.property_name} roomNumber={repair.room_number}
                 repairCategory={repair.category} repairDescription={repair.description}
-                photoCount={(repair.repair_photos?.length ?? 0) || (repair.photo_url ? 1 : 0)}
+                repairPhotos={repair.repair_photos ?? []} fallbackPhotoUrl={repair.photo_url}
+                tenantMessages={repair.tenant_messages ?? []}
                 managementCompanyName="株式会社CREDO" />
               {canUpdate && repair.vendor_dispatches?.filter((dispatch) =>
                 !["candidate","cancelled"].includes(dispatch.status)).map((dispatch) =>

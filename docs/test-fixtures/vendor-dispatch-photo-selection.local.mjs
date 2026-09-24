@@ -1,0 +1,358 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
+import { tmpdir } from "node:os";
+import { checkPhotoSelectionConstraints } from "./vendor-dispatch-photo-selection.constraints.mjs";
+import vm from "node:vm";
+import ts from "typescript";
+
+// Exercise the Server Action's photo-input parser, without running the app suite.
+const parserExports = {};
+vm.runInNewContext(ts.transpileModule(readFileSync(new URL("../../lib/vendor-dispatch.ts", import.meta.url), "utf8"),
+  {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,
+  {exports:parserExports});
+for (const id of ["1", "9223372036854775807", "-9223372036854775808"])
+  assert.equal(parserExports.normalizeRepairPhotoId(id),id);
+for (const id of ["9223372036854775808", "-9223372036854775809", "1.2", "1e3", "", Number.MAX_SAFE_INTEGER+1])
+  assert.equal(parserExports.normalizeRepairPhotoId(id),null);
+
+const packagePath = join(tmpdir(), "vendor-dispatch-sql-test", "node_modules", "@electric-sql", "pglite", "dist", "index.js");
+const { PGlite } = await import(pathToFileURL(packagePath).href);
+const db = new PGlite();
+const identityMode = process.argv[2] ?? "existing";
+assert.ok(["existing", "composite"].includes(identityMode));
+const org = "11111111-1111-4111-8111-111111111111";
+const otherOrg = "99999999-9999-4999-8999-999999999999";
+const actor = "22222222-2222-4222-8222-222222222222";
+const dispatch = "33333333-3333-4333-8333-333333333333";
+const line = "66666666-6666-4666-8666-666666666666";
+const request = "77777777-7777-4777-8777-777777777777";
+const input = [org, dispatch, actor, request, "本文", "業者", null];
+const actionInput = {repairId:23,dispatchId:dispatch,requestId:request,messageBody:"本文",externalDeliveryConfirmed:true};
+assert.equal(parserExports.parseConfirmManualDispatchInput({...actionInput,
+  photos:[{sourceType:"repair_photo",sourceId:"9223372036854775807"}]}).photos[0].sourceId,"9223372036854775807");
+assert.equal(parserExports.parseConfirmManualDispatchInput({...actionInput,
+  photos:[{sourceType:"repair_photo",sourceId:line}]}),null);
+assert.equal(parserExports.parseConfirmManualDispatchInput({...actionInput,
+  photos:[{sourceType:"tenant_line_attachment",sourceId:"1"}]}),null);
+const q = (sql, params = []) => db.query(sql, params);
+
+await db.exec(`
+create role anon; create role authenticated; create role service_role;
+create schema private;
+create function private.has_org_role(uuid,text[]) returns boolean language sql as 'select true';
+create table public.repair_requests(id bigint primary key,organization_id uuid not null,
+  photo_url text,storage_path text);
+create table public.repair_photos(repair_id bigint,organization_id uuid not null,
+  photo_url text,storage_path text,sort_order integer);
+create table public.tenant_line_attachments(id uuid primary key,organization_id uuid not null,
+  repair_request_id bigint,media_type text not null);
+create table public.organization_members(organization_id uuid not null,auth_user_id uuid not null,
+  is_active boolean not null,role text not null,primary key(organization_id,auth_user_id));
+create table public.repair_vendor_dispatches(id uuid primary key,organization_id uuid not null,
+  repair_request_id bigint not null,status text not null
+    check (status in ('candidate','dispatched','acknowledged','scheduling',
+      'visit_scheduled','completed','cancelled')),unique(organization_id,id));
+create table public.repair_vendor_dispatch_events(id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null,dispatch_id uuid not null);
+create table public.repair_vendors(id uuid primary key);
+create function public._vendor_phase1_no_change() returns trigger language plpgsql as $$
+begin raise exception 'IMMUTABLE'; end $$;
+create function public.transition_repair_vendor_dispatch(uuid,uuid,text,uuid,text)
+returns void language plpgsql security definer as $$ begin
+  update public.repair_vendor_dispatches set status=$3 where organization_id=$1 and id=$2;
+  insert into public.repair_vendor_dispatch_events(organization_id,dispatch_id) values($1,$2);
+end $$;
+revoke all on function public.transition_repair_vendor_dispatch(uuid,uuid,text,uuid,text)
+  from public,anon,authenticated,service_role;
+grant execute on function public.transition_repair_vendor_dispatch(uuid,uuid,text,uuid,text)
+  to authenticated;
+alter table public.repair_vendor_dispatches enable row level security;
+alter table public.repair_vendor_dispatch_events enable row level security;
+alter table public.repair_photos enable row level security;
+alter table public.tenant_line_attachments enable row level security;
+alter table public.repair_requests enable row level security;
+alter table public.organization_members enable row level security;
+`);
+await db.exec(`alter table public.repair_photos add column id bigint generated by default as identity;
+  alter table public.repair_photos add constraint local_photo_identity_key
+  ${identityMode === "composite" ? "unique(organization_id,id)" : "primary key(id)"};`);
+// Use the existing production migration, including the real policy and old RPC.
+await db.exec(readFileSync(new URL("../vendor-dispatch-messaging.migration.sql", import.meta.url), "utf8"));
+await q(`insert into public.repair_requests values(23,$1,'https://example.test/legacy.jpg',null),
+  (24,$2,null,null)`, [org, otherOrg]);
+await q(`insert into public.repair_photos(repair_id,organization_id,photo_url) values
+  (23,$1,'one'),(23,$1,'two'),(24,$2,'foreign')`, [org, otherOrg]);
+await q(`insert into public.repair_photos(repair_id,organization_id,photo_url)
+  select 23,$1,'z-existing-'||n from generate_series(1,45) n`, [org]);
+await q(`insert into public.tenant_line_attachments values($1,$2,23,'image'),
+  ($3,$2,23,'pdf'),($4,$5,24,'image')`, [line, org,
+  "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", otherOrg]);
+await q(`insert into public.organization_members values($1,$2,true,'staff')`, [org,actor]);
+await q(`insert into public.repair_vendor_dispatches values($1,$2,23,'candidate')`, [dispatch,org]);
+await q(`insert into public.repair_vendor_dispatch_messages
+  (organization_id,dispatch_id,channel,message_body,recipient_label,sent_by,request_id,
+    sent_at,delivery_status,created_at)
+  values($1,$2,'manual','旧本文','旧業者',$3,$4,now(),'manual_confirmed',now())`,
+  [org,dispatch,actor,crypto.randomUUID()]);
+
+const preflight = readFileSync(new URL("../vendor-dispatch-photo-selection.production-preflight.readonly.sql", import.meta.url), "utf8");
+const before = await q(preflight);
+assert.equal(before.rows.length,11);
+for (const row of before.rows.slice(0,-1)) assert.equal(row.result.all_match,true,
+  `${row.item}: ${JSON.stringify(row.result.details)}`);
+assert.equal(before.rows.at(-1).result.overall_ready, true);
+const localPhotos = before.rows.find((row) => row.item === "repair_photos existing data").result.details;
+const localMessages = before.rows.find((row) => row.item === "existing message security and history").result.details;
+assert.equal(localPhotos.total_rows,48);
+assert.equal(localMessages.total_rows,1);
+// Each drift must fail its section AND overall readiness, without changing baseline.
+async function rejectedPreflight(sql, item) {
+  await db.exec("begin;");
+  try {
+    await db.exec(sql);
+    const report = await q(preflight);
+    assert.equal(report.rows.find((r) => r.item === item).result.all_match, false, sql);
+    assert.equal(report.rows.at(-1).result.overall_ready, false, sql);
+  } finally { await db.exec("rollback;"); }
+}
+for (const sql of [
+  "alter table public.repair_photos alter column id drop identity; alter table public.repair_photos alter column id type text using id::text",
+  "alter table public.repair_photos drop constraint local_photo_identity_key; alter table public.repair_photos alter column id drop identity; alter table public.repair_photos alter column id drop not null",
+  "alter table public.repair_photos drop constraint local_photo_identity_key",
+  "alter table public.repair_photos drop column id",
+  `alter table public.repair_photos drop constraint local_photo_identity_key;
+   alter table public.repair_photos add constraint local_photo_identity_key unique(id) deferrable initially deferred`,
+]) await rejectedPreflight(sql, "migration prerequisites");
+await db.exec("begin; alter table public.repair_photos alter column id drop identity;");
+assert.equal((await q(preflight)).rows.at(-1).result.overall_ready,true);
+await db.exec("rollback;");
+await q(`insert into public.repair_photos(repair_id,organization_id,photo_url)
+  values(null,$1,'unassigned')`, [org]);
+const nullableReport = await q(preflight);
+assert.equal(nullableReport.rows.at(-1).result.overall_ready, true);
+assert.equal(nullableReport.rows.find((r) => r.item === "repair_photos existing data").result.details.null_repair_rows, 1);
+await q("delete from public.repair_photos where photo_url='unassigned'");
+await rejectedPreflight(`insert into public.repair_photos(repair_id,organization_id,photo_url)
+  values(24,'${org}','cross-org')`, "repair_photos existing data");
+for (const sql of [
+  "alter table public.repair_vendor_dispatches alter column status drop not null",
+  "alter table public.repair_vendor_dispatches alter column status type varchar(40)",
+]) await rejectedPreflight(sql, "required columns: type and nullability");
+for (const sql of [
+  "alter policy repair_vendor_dispatch_messages_staff_read on public.repair_vendor_dispatch_messages using (true)",
+  "alter policy repair_vendor_dispatch_messages_staff_read on public.repair_vendor_dispatch_messages using (private.has_org_role(organization_id,array['admin','manager','staff','viewer']::text[]) OR true)",
+  "alter policy repair_vendor_dispatch_messages_staff_read on public.repair_vendor_dispatch_messages using (private.has_org_role(organization_id,array['admin','manager','staff','viewer','tenant']::text[]))",
+  "alter policy repair_vendor_dispatch_messages_staff_read on public.repair_vendor_dispatch_messages to public",
+  "drop policy repair_vendor_dispatch_messages_staff_read on public.repair_vendor_dispatch_messages",
+  `drop policy repair_vendor_dispatch_messages_staff_read on public.repair_vendor_dispatch_messages;
+   create policy repair_vendor_dispatch_messages_staff_read on public.repair_vendor_dispatch_messages
+   for all to authenticated using (private.has_org_role(organization_id,array['admin','manager','staff','viewer']::text[])) with check (true)`,
+]) await rejectedPreflight(sql, "existing message security and history");
+for (const definition of [
+  "unique(organization_id,request_id) deferrable initially immediate",
+  "unique(organization_id,request_id) deferrable initially deferred",
+  "unique(organization_id,request_id,id)",
+]) await rejectedPreflight(`alter table public.repair_vendor_dispatch_messages
+  drop constraint vendor_dispatch_messages_request_uq;
+  alter table public.repair_vendor_dispatch_messages add constraint vendor_dispatch_messages_request_uq ${definition}`,
+  "existing composite keys and foreign keys");
+const fkName = (await q(`select conname from pg_constraint where contype='f'
+  and conrelid='public.repair_vendor_dispatch_messages'::regclass
+  and confrelid='public.repair_vendor_dispatches'::regclass`)).rows[0].conname;
+for (const options of ["not valid", "deferrable initially deferred", "on update cascade"]) {
+  await rejectedPreflight(`alter table public.repair_vendor_dispatch_messages drop constraint "${fkName}";
+    alter table public.repair_vendor_dispatch_messages add constraint "${fkName}"
+    foreign key(organization_id,dispatch_id) references public.repair_vendor_dispatches(organization_id,id) ${options}`,
+    "existing composite keys and foreign keys");
+}
+for (const check of [
+  "check (status in ('candidate','dispatched','acknowledged','scheduling','visit_scheduled','completed','cancelled')) not valid",
+  "check (status is not null)",
+]) await rejectedPreflight(`alter table public.repair_vendor_dispatches drop constraint repair_vendor_dispatches_status_check;
+  alter table public.repair_vendor_dispatches add constraint repair_vendor_dispatches_status_check ${check}`,
+  "existing composite keys and foreign keys");
+await q(`insert into public.repair_photos(repair_id,organization_id,photo_url)
+  values(999,$1,'local-orphan')`,[org]);
+const orphanReport = await q(preflight);
+assert.equal(orphanReport.rows.find((row) => row.item === "repair_photos existing data").result.all_match,false);
+assert.equal(orphanReport.rows.at(-1).result.overall_ready,false);
+await q(`delete from public.repair_photos where photo_url='local-orphan'`);
+await q(`insert into public.tenant_line_attachments values($1,$2,999,'image')`,[crypto.randomUUID(),org]);
+const lineOrphanReport = await q(preflight);
+assert.equal(lineOrphanReport.rows.find((row) => row.item === "tenant LINE attachment existing data").result.all_match,false);
+assert.equal(lineOrphanReport.rows.at(-1).result.overall_ready,false);
+await q(`delete from public.tenant_line_attachments where repair_request_id=999`);
+const migration = readFileSync(new URL("../vendor-dispatch-photo-selection.migration.sql", import.meta.url), "utf8");
+// Fail after the DDL/new table and verify atomic rollback, then apply cleanly.
+const originalPhotos = (await q("select * from public.repair_photos order by photo_url")).rows;
+const physicalRows = (await q("select id,ctid::text,xmin::text from public.repair_photos order by id")).rows;
+const identityBefore = (await q(`select attidentity,attnotnull,atttypid::text from pg_attribute
+  where attrelid='public.repair_photos'::regclass and attname='id'`)).rows;
+await db.exec("alter table public.repair_photos drop constraint local_photo_identity_key;");
+await assert.rejects(db.exec(migration), /Existing repair_photos.id must/);
+await db.exec("rollback;");
+assert.deepEqual((await q("select * from public.repair_photos order by photo_url")).rows,originalPhotos);
+await db.exec(`alter table public.repair_photos add constraint local_photo_identity_key
+  ${identityMode === "composite" ? "unique(organization_id,id)" : "primary key(id)"};`);
+await db.exec(`create function public._vendor_dispatch_attachment_scope_guard() returns trigger
+  language plpgsql as $$begin return new; end$$;`);
+await assert.rejects(db.exec(migration), /already exists/);
+await db.exec("rollback;");
+assert.deepEqual((await q("select * from public.repair_photos order by photo_url")).rows, originalPhotos);
+assert.equal((await q(`select count(*)::int n from pg_attribute
+  where attrelid='public.repair_vendor_dispatch_messages'::regclass
+  and attname='photo_selection_recorded' and not attisdropped`)).rows[0].n, 0);
+assert.equal((await q("select to_regclass('public.repair_vendor_dispatch_message_attachments') obj")).rows[0].obj, null);
+await db.exec("drop function public._vendor_dispatch_attachment_scope_guard();");
+assert.equal((await q(preflight)).rows.at(-1).result.overall_ready, true);
+await db.exec(migration);
+assert.deepEqual((await q("select id,ctid::text,xmin::text from public.repair_photos order by id")).rows,physicalRows);
+assert.deepEqual((await q(`select attidentity,attnotnull,atttypid::text from pg_attribute
+  where attrelid='public.repair_photos'::regclass and attname='id'`)).rows,identityBefore);
+await checkPhotoSelectionConstraints(q);
+assert.equal((await q(`select count(*)::int n from public.repair_vendor_dispatch_messages
+  where photo_selection_recorded=false`)).rows[0].n,1);
+const ids = await q(`select id from public.repair_photos where organization_id=$1 order by photo_url limit 2`,[org]);
+const [first,second] = ids.rows.map((row) => row.id);
+assert.ok(first && second && first !== second);
+assert.deepEqual((await q("select repair_id,organization_id,photo_url,storage_path,sort_order from public.repair_photos order by photo_url")).rows,
+  originalPhotos.map(({id, ...photo}) => photo));
+assert.deepEqual((await q("select * from public.repair_photos order by photo_url")).rows, originalPhotos);
+assert.equal((await q(`select attnotnull from pg_attribute where attrelid='public.repair_photos'::regclass
+  and attname='repair_id'`)).rows[0].attnotnull,false);
+// Old photo inserts retain the existing bigint identity; old RPC still omits the marker.
+const newPhoto = (await q(`insert into public.repair_photos(repair_id,organization_id,photo_url)
+  values(23,$1,'new-after-migration') returning id`, [org])).rows[0].id;
+assert.ok(newPhoto && newPhoto !== first && newPhoto !== second);
+await assert.rejects(q(`insert into public.repair_photos(repair_id,organization_id,id)
+  values(23,$1,$2)`, [org, first]), /duplicate key/);
+await assert.rejects(q(`insert into public.repair_photos(repair_id,organization_id,id)
+  values(23,$1,null)`, [org]), /not-null/);
+const oldDispatch = crypto.randomUUID();
+await q(`insert into public.repair_vendor_dispatches values($1,$2,23,'candidate')`, [oldDispatch,org]);
+const oldRpc = `select photo_selection_recorded from public.confirm_vendor_dispatch_manual($1,$2,$3,$4,$5,$6,$7)`;
+assert.equal((await q(oldRpc,[org,oldDispatch,actor,crypto.randomUUID(),"旧本文","旧業者",null])).rows[0].photo_selection_recorded,false);
+const payload = (photos) => JSON.stringify(photos);
+const rpc = `select id from public.confirm_vendor_dispatch_manual_v2($1,$2,$3,$4,$5,$6,$7,$8::jsonb)`;
+for (const invalid of [line,"1.5","9223372036854775808",null])
+  await assert.rejects(q(rpc,[...input,payload([{source_type:"repair_photo",source_id:invalid}])]),/VENDOR_ATTACHMENT_PAYLOAD_INVALID/);
+const photos = [{source_type:"repair_photo",source_id:first},
+  {source_type:"tenant_line_attachment",source_id:line},
+  {source_type:"repair_photo",source_id:second}];
+const saved = await q(rpc,[...input,payload(photos)]);
+const again = await q(rpc,[...input,payload(photos)]);
+assert.equal(saved.rows[0].id,again.rows[0].id);
+const rows = await q(`select source_type,sort_order from public.repair_vendor_dispatch_message_attachments
+  where message_id=$1 order by sort_order`,[saved.rows[0].id]);
+assert.deepEqual(rows.rows.map((row) => row.source_type),
+  ["repair_photo","tenant_line_attachment","repair_photo"]);
+assert.deepEqual(rows.rows.map((row) => row.sort_order),[0,1,2]);
+assert.equal((await q(`select count(*)::int n from public.repair_vendor_dispatch_events where dispatch_id=$1`,[dispatch])).rows[0].n,1);
+assert.equal((await q(`select status from public.repair_vendor_dispatches where id=$1`,[dispatch])).rows[0].status,"dispatched");
+await assert.rejects(q(rpc,[...input,payload([...photos].reverse())]),/VENDOR_DISPATCH_MESSAGE_REQUEST_CONFLICT/);
+await assert.rejects(q(`update public.repair_vendor_dispatch_message_attachments set sort_order=9 where message_id=$1`,[saved.rows[0].id]),/IMMUTABLE/);
+await assert.rejects(q(`delete from public.repair_vendor_dispatch_message_attachments where message_id=$1`,[saved.rows[0].id]),/IMMUTABLE/);
+// Same-organization moves and NULL unassignment must fail even for a privileged writer.
+await q(`insert into public.repair_requests values(25,$1,null,null)`, [org]);
+for (const [sql, params] of [
+  ["update public.repair_photos set repair_id=25 where id=$1", [first]],
+  ["update public.repair_photos set repair_id=null where id=$1", [first]],
+  ["update public.repair_photos set organization_id=$2 where id=$1", [first,otherOrg]],
+  ["update public.tenant_line_attachments set repair_request_id=25 where id=$1", [line]],
+  ["update public.tenant_line_attachments set repair_request_id=null where id=$1", [line]],
+  ["update public.tenant_line_attachments set organization_id=$2 where id=$1", [line,otherOrg]],
+  ["update public.repair_vendor_dispatches set repair_request_id=25 where id=$1", [dispatch]],
+  ["delete from public.repair_photos where id=$1", [first]],
+  ["delete from public.tenant_line_attachments where id=$1", [line]],
+]) await assert.rejects(q(sql, params), /foreign key/);
+assert.equal((await q(`select repair_request_id from public.repair_vendor_dispatch_message_attachments
+  where message_id=$1 limit 1`, [saved.rows[0].id])).rows[0].repair_request_id, 23);
+// Unreferenced sources remain assignable; only recorded history pins a source.
+await q("update public.repair_photos set repair_id=25 where id=$1", [newPhoto]);
+const unselectedLine = crypto.randomUUID();
+await q("insert into public.tenant_line_attachments values($1,$2,23,'image')", [unselectedLine,org]);
+await q("update public.tenant_line_attachments set repair_request_id=25 where id=$1", [unselectedLine]);
+
+async function failedAttempt(photosToSend) {
+  const nextDispatch = crypto.randomUUID();
+  await q(`insert into public.repair_vendor_dispatches values($1,$2,23,'candidate')`,[nextDispatch,org]);
+  const nextRequest = crypto.randomUUID();
+  await assert.rejects(q(rpc,[org,nextDispatch,actor,nextRequest,"本文","業者",null,payload(photosToSend)]),
+    /VENDOR_ATTACHMENT_SCOPE_DENIED|violates foreign key|duplicate key/);
+  assert.equal((await q(`select count(*)::int n from public.repair_vendor_dispatch_messages where request_id=$1`,[nextRequest])).rows[0].n,0);
+  assert.equal((await q(`select status from public.repair_vendor_dispatches where id=$1`,[nextDispatch])).rows[0].status,"candidate");
+}
+await failedAttempt([{source_type:"repair_photo",source_id:newPhoto}]);
+await q("update public.repair_photos set repair_id=null where id=$1", [newPhoto]);
+await failedAttempt([{source_type:"repair_photo",source_id:newPhoto}]);
+await failedAttempt([{source_type:"tenant_line_attachment",source_id:unselectedLine}]);
+await failedAttempt([{source_type:"repair_photo",source_id:(await q(
+  `select id from public.repair_photos where organization_id=$1`,[otherOrg])).rows[0].id}]);
+await failedAttempt([{source_type:"tenant_line_attachment",source_id:
+  "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}]);
+await failedAttempt([{source_type:"repair_photo",source_id:first},
+  {source_type:"repair_photo",source_id:first}]);
+await failedAttempt([{source_type:"tenant_line_attachment",source_id:
+  "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"}]);
+const emptyDispatch = crypto.randomUUID();
+await q(`insert into public.repair_vendor_dispatches values($1,$2,23,'candidate')`,[emptyDispatch,org]);
+const emptyRequest = crypto.randomUUID();
+const empty = await q(rpc,[org,emptyDispatch,actor,emptyRequest,"本文","業者",null,payload([])]);
+assert.equal((await q(`select photo_selection_recorded from public.repair_vendor_dispatch_messages
+  where id=$1`, [empty.rows[0].id])).rows[0].photo_selection_recorded,true);
+assert.equal((await q(`select count(*)::int n from public.repair_vendor_dispatch_message_attachments
+  where message_id=$1`,[empty.rows[0].id])).rows[0].n,0);
+for (const selected of [
+  [{source_type:"repair_photo",source_id:first}],
+  [{source_type:"repair_photo",source_id:first},{source_type:"repair_photo",source_id:second}],
+  [{source_type:"tenant_line_attachment",source_id:line}],
+]) {
+  const selectedDispatch = crypto.randomUUID();
+  await q(`insert into public.repair_vendor_dispatches values($1,$2,23,'candidate')`,[selectedDispatch,org]);
+  const selectedMessage = await q(rpc,[org,selectedDispatch,actor,crypto.randomUUID(),
+    "本文","業者",null,payload(selected)]);
+  const selectedRows = await q(`select source_type from public.repair_vendor_dispatch_message_attachments
+    where message_id=$1 order by sort_order`,[selectedMessage.rows[0].id]);
+  assert.deepEqual(selectedRows.rows.map((row) => row.source_type),
+    selected.map((item) => item.source_type));
+}
+const legacyDispatch = crypto.randomUUID();
+await q(`insert into public.repair_vendor_dispatches values($1,$2,23,'candidate')`,[legacyDispatch,org]);
+const legacy = await q(rpc,[org,legacyDispatch,actor,crypto.randomUUID(),"本文","業者",null,
+  payload([{source_type:"legacy_photo",source_id:null}])]);
+assert.equal((await q(`select legacy_source_key from public.repair_vendor_dispatch_message_attachments
+  where message_id=$1`,[legacy.rows[0].id])).rows[0].legacy_source_key,"repair_request:23");
+const viewer = crypto.randomUUID();
+// Preserve full bigint precision through RPC normalization, storage and retry.
+const largeId = "9223372036854775807";
+await q(`insert into public.repair_photos(id,organization_id,repair_id) values($1,$2,23)`,[largeId,org]);
+const largeDispatch = crypto.randomUUID();
+await q(`insert into public.repair_vendor_dispatches values($1,$2,23,'candidate')`,[largeDispatch,org]);
+const largeInput = [org,largeDispatch,actor,crypto.randomUUID(),"本文","業者",null,
+  payload([{source_type:"repair_photo",source_id:largeId}])];
+const largeMessage = (await q(rpc,largeInput)).rows[0].id;
+assert.equal((await q(rpc,largeInput)).rows[0].id,largeMessage);
+assert.equal((await q(`select repair_photo_id::text id from public.repair_vendor_dispatch_message_attachments
+  where message_id=$1`,[largeMessage])).rows[0].id,largeId);
+await q(`insert into public.organization_members values($1,$2,true,'viewer')`,[org,viewer]);
+await assert.rejects(q(rpc,[org,crypto.randomUUID(),viewer,crypto.randomUUID(),"本文","業者",null,payload([])]),
+  /VENDOR_DISPATCH_MESSAGE_SCOPE_DENIED/);
+const acl = await q(`select
+  has_table_privilege('authenticated','public.repair_vendor_dispatch_message_attachments','SELECT') can_read,
+  has_table_privilege('authenticated','public.repair_vendor_dispatch_message_attachments','INSERT') can_insert,
+  has_table_privilege('authenticated','public.repair_vendor_dispatch_message_attachments','UPDATE') can_update,
+  has_table_privilege('authenticated','public.repair_vendor_dispatch_message_attachments','DELETE') can_delete,
+  has_function_privilege('authenticated',
+    'public.confirm_vendor_dispatch_manual_v2(uuid,uuid,uuid,uuid,text,text,text,jsonb)','EXECUTE') can_execute`);
+assert.deepEqual(acl.rows[0],{can_read:true,can_insert:false,can_update:false,can_delete:false,can_execute:false});
+console.log(JSON.stringify({result:"PASS",identity_mode:identityMode,preflight_rows:before.rows.length,
+  all_match:before.rows.slice(0,-1).every((row) => row.result.all_match),
+  sections:Object.fromEntries(before.rows.slice(0,-1).map((row) => [row.item,row.result.all_match])),
+  overall_ready:before.rows.at(-1).result.overall_ready,
+  existing_photos:localPhotos.total_rows,existing_messages:localMessages.total_rows,
+  migration_and_rpc:"PASS",constraint_catalog:"PASS",preflight_drift_rejection:"PASS",
+  persistent_repair_scope:"PASS",migration_rollback:"PASS",old_rpc_and_empty_v2:"PASS"}));
+await db.close();

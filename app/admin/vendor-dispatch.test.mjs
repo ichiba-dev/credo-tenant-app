@@ -178,12 +178,13 @@ function manualSetup({ role = "admin", dispatchOrg = "org-a", vendorOrg = "org-a
   context.supabase = authDb;
   const serviceDb = { async rpc(name, args) {
     serviceCalls.push([name, args]);
-    assert.equal(name, "confirm_vendor_dispatch_manual");
+    assert.equal(name, "confirm_vendor_dispatch_manual_v2");
     const key = `${args.p_org}:${args.p_request_id}`;
     const prior = messages.get(key);
     if (prior) {
       if (prior.dispatch_id !== args.p_dispatch || prior.message_body !== args.p_message_body ||
-          prior.recipient_label !== args.p_recipient_label || prior.recipient_address !== args.p_recipient_address)
+          prior.recipient_label !== args.p_recipient_label || prior.recipient_address !== args.p_recipient_address ||
+          JSON.stringify(prior.photos) !== JSON.stringify(args.p_photos))
         return { data: null, error: { message: "VENDOR_DISPATCH_MESSAGE_REQUEST_CONFLICT" } };
       return { data: prior, error: null };
     }
@@ -192,7 +193,8 @@ function manualSetup({ role = "admin", dispatchOrg = "org-a", vendorOrg = "org-a
     const row = { id: `message-${messages.size + 1}`, organization_id: args.p_org,
       dispatch_id: args.p_dispatch, request_id: args.p_request_id, sent_by: args.p_actor,
       channel: "manual", delivery_status: "manual_confirmed", message_body: args.p_message_body,
-      recipient_label: args.p_recipient_label, recipient_address: args.p_recipient_address };
+      recipient_label: args.p_recipient_label, recipient_address: args.p_recipient_address,
+      photos: args.p_photos };
     messages.set(key, row);
     statuses.set(args.p_dispatch, "dispatched");
     eventCounts.set(args.p_dispatch, (eventCounts.get(args.p_dispatch) ?? 0) + 1);
@@ -216,6 +218,26 @@ test("manual dispatch confirmation validates body and explicit external delivery
   assert.equal(validation.parseConfirmManualDispatchInput({ ...manualBase, externalDeliveryConfirmed: false }), null);
   assert.equal(validation.parseConfirmManualDispatchInput({ ...manualBase, messageBody: " " }), null);
   assert.equal(validation.parseConfirmManualDispatchInput({ ...manualBase, messageBody: "あ".repeat(10001) }), null);
+  assert.equal(validation.parseConfirmManualDispatchInput({ ...manualBase,
+    photos: [{ sourceType: "repair_photo", sourceId: "9223372036854775807" },
+      { sourceType: "repair_photo", sourceId: "9223372036854775807" }] }), null);
+});
+
+test("photo order is forwarded and different photo payload conflicts on retry", async () => {
+  const subject = manualSetup();
+  const photos = [{ sourceType: "repair_photo", sourceId: "9223372036854775807" },
+    { sourceType: "tenant_line_attachment", sourceId: requestId }];
+  assert.equal((await subject.confirmManualVendorDispatch({ ...manualBase, photos })).ok, true);
+  assert.deepEqual(JSON.parse(JSON.stringify(subject.serviceCalls[0][1].p_photos)), [
+    { source_type: "repair_photo", source_id: "9223372036854775807" },
+    { source_type: "tenant_line_attachment", source_id: requestId },
+  ]);
+  assert.equal((await subject.confirmManualVendorDispatch({ ...manualBase, photos })).ok, true);
+  const reversed = await subject.confirmManualVendorDispatch({ ...manualBase, photos: [...photos].reverse() });
+  assert.equal(reversed.ok, false);
+  assert.equal(reversed.conflict, true);
+  assert.equal(subject.messages.size, 1);
+  assert.equal(subject.eventCounts.get(manualBase.dispatchId), 1);
 });
 
 for (const role of ["admin", "manager", "staff"]) test(`${role} can manually confirm a candidate dispatch`, async () => {
@@ -330,12 +352,27 @@ test("manual delivery history is returned with its staff actor", async () => {
     repair_vendor_dispatch_messages: [{ id: "message-a", organization_id: "org-a", dispatch_id: "dispatch-a",
       channel: "manual", message_body: "本文", recipient_label: "テスト設備 田中",
       recipient_address: "090-0000-0000", sent_by: "user-a", sent_at: "2026-09-21T07:30:00Z",
-      delivery_status: "manual_confirmed" }],
+      delivery_status: "manual_confirmed", photo_selection_recorded: true }],
+    repair_vendor_dispatch_message_attachments: [
+      { id: "photo-a", organization_id: "org-a", message_id: "message-a", source_type: "repair_photo", sort_order: 0 },
+      { id: "photo-b", organization_id: "org-a", message_id: "message-a", source_type: "tenant_line_attachment", sort_order: 1 },
+    ],
   });
   const result = await subject.get();
   assert.equal(result.byRepair[repairId][0].messages.length, 1);
   assert.equal(result.byRepair[repairId][0].messages[0].deliveryStatus, "manual_confirmed");
   assert.equal(result.byRepair[repairId][0].messages[0].sentByName, "市場");
+  assert.equal(result.byRepair[repairId][0].messages[0].photoSelectionRecorded, true);
+  assert.deepEqual(JSON.parse(JSON.stringify(result.byRepair[repairId][0].messages[0].attachments.map((photo) => photo.sourceType))),
+    ["repair_photo", "tenant_line_attachment"]);
+});
+
+test("foreign attachment history fails closed", async () => {
+  const subject = dataSubject({ repair_vendor_dispatch_messages: [{ id: "message-a", organization_id: "org-a",
+    dispatch_id: "dispatch-a", sent_by: "user-a" }], repair_vendor_dispatch_message_attachments: [
+      { id: "photo-a", organization_id: "org-b", message_id: "message-a", source_type: "repair_photo", sort_order: 0 },
+    ] });
+  await assert.rejects(subject.get(), /VENDOR_DISPATCH_ATTACHMENTS_SCOPE_MISMATCH/);
 });
 
 test("dispatch UI always offers add, warns for a repeated vendor and keeps viewer gating", () => {

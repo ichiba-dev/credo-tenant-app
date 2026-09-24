@@ -25,6 +25,8 @@ export type UnassignedLineMessage = {
 };
 
 export type RepairPhoto = {
+  // PostgreSQL bigint serialized as decimal text (not a UUID).
+  id?: string;
   repair_id: number;
   photo_url: string;
   sort_order: number | null;
@@ -63,6 +65,8 @@ export type VendorDispatchMessage = {
   deliveryStatus: string;
   sentAt: string | null;
   sentByName: string;
+  photoSelectionRecorded?: boolean;
+  attachments?: { id: string; sourceType: "repair_photo" | "tenant_line_attachment" | "legacy_photo"; sortOrder: number }[];
 };
 
 export type VendorDispatchEvent = {

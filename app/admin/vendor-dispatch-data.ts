@@ -48,13 +48,24 @@ export async function getVendorDispatchData(context: StaffContext, repairIds: nu
       .eq("organization_id", organizationId).in("dispatch_id", dispatchIds)
       .order("occurred_at", { ascending: true }) : Promise.resolve({ data: [], error: null }),
     dispatchIds.length ? supabase.from("repair_vendor_dispatch_messages")
-      .select("id,organization_id,dispatch_id,channel,message_body,recipient_label,recipient_address,sent_by,sent_at,delivery_status")
+      .select("id,organization_id,dispatch_id,channel,message_body,recipient_label,recipient_address,sent_by,sent_at,delivery_status,photo_selection_recorded")
       .eq("organization_id", organizationId).in("dispatch_id", dispatchIds)
       .order("sent_at", { ascending: true }) : Promise.resolve({ data: [], error: null }),
   ]);
   if (eventResult.error || messageResult.error) throw new Error("VENDOR_DISPATCH_HISTORY_UNAVAILABLE");
   const events = eventResult.data ?? [];
   const messages = messageResult.data ?? [];
+  const messageIds = messages.map((row) => row.id);
+  const attachmentResult = messageIds.length ? await supabase.from("repair_vendor_dispatch_message_attachments")
+    .select("id,organization_id,message_id,source_type,sort_order")
+    .eq("organization_id", organizationId).in("message_id", messageIds)
+    .order("sort_order", { ascending: true }) : { data: [], error: null };
+  if (attachmentResult.error) throw new Error("VENDOR_DISPATCH_ATTACHMENTS_UNAVAILABLE");
+  const attachments = attachmentResult.data ?? [];
+  const messageIdSet = new Set(messageIds);
+  if (attachments.some((row) => row.organization_id !== organizationId ||
+      !messageIdSet.has(row.message_id) || !["repair_photo", "tenant_line_attachment", "legacy_photo"].includes(row.source_type)))
+    throw new Error("VENDOR_DISPATCH_ATTACHMENTS_SCOPE_MISMATCH");
   const allActorIds = [...new Set([...actorIds, ...events.map((row) => row.actor_auth_user_id),
     ...messages.map((row) => row.sent_by)])];
   let members: { organization_id: string; auth_user_id: string; display_name: string | null }[] = [];
@@ -103,6 +114,11 @@ export async function getVendorDispatchData(context: StaffContext, repairIds: nu
         deliveryStatus: message.delivery_status,
         sentAt: message.sent_at,
         sentByName: memberMap.get(message.sent_by) ?? "担当スタッフ",
+        photoSelectionRecorded: message.photo_selection_recorded === true,
+        attachments: attachments.filter((photo) => photo.message_id === message.id).map((photo) => ({
+          id: photo.id, sourceType: photo.source_type as "repair_photo" | "tenant_line_attachment" | "legacy_photo",
+          sortOrder: photo.sort_order,
+        })),
       })),
     });
   }

@@ -3,7 +3,8 @@
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { confirmManualVendorDispatch, selectRepairVendor } from "./vendor-dispatch-actions";
-import type { VendorCandidate, VendorDispatchHistory } from "./types";
+import type { RepairPhoto, TenantRepairMessage, VendorCandidate, VendorDispatchHistory } from "./types";
+import { managementRequest, manualMessageDraft, tenantLineTextMessages, uniqueDispatchPhotos, updateDraftPhotoCount } from "./vendor-dispatch-compose";
 
 const statusLabels: Record<string, string> = {
   candidate: "手配候補",
@@ -23,19 +24,9 @@ const formatDate = (value: string) => new Intl.DateTimeFormat("ja-JP", {
   timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit",
 }).format(new Date(value));
 
-function manualMessageDraft(dispatch: VendorDispatchHistory, repair: {
-  propertyName: string;
-  roomNumber: string;
-  category: string;
-  description: string;
-  managementCompanyName: string;
-}) {
-  return `${dispatch.vendorName}\n${dispatch.vendorContactName}様\n\nいつもお世話になっております。\n${repair.managementCompanyName}です。\n\n下記修繕についてご対応をお願いいたします。\n\n物件：${repair.propertyName}\n号室：${repair.roomNumber}号室\n修繕カテゴリ：${repair.category}\n\n修繕内容：\n${repair.description}\n\n手配内容：\n${dispatch.instructions}\n\nよろしくお願いいたします。`;
-}
-
 export function VendorDispatchSection({ repairId, candidates, dispatches, canUpdate,
   unavailable, suggestedInstructions, propertyName, roomNumber, repairCategory,
-  repairDescription, photoCount, managementCompanyName }: {
+  repairDescription, repairPhotos, fallbackPhotoUrl, tenantMessages, managementCompanyName }: {
   repairId: number;
   candidates: VendorCandidate[];
   dispatches: VendorDispatchHistory[];
@@ -46,7 +37,9 @@ export function VendorDispatchSection({ repairId, candidates, dispatches, canUpd
   roomNumber: string;
   repairCategory: string;
   repairDescription: string;
-  photoCount: number;
+  repairPhotos: RepairPhoto[];
+  fallbackPhotoUrl: string | null;
+  tenantMessages: TenantRepairMessage[];
   managementCompanyName: string;
 }) {
   const router = useRouter();
@@ -67,6 +60,23 @@ export function VendorDispatchSection({ repairId, candidates, dispatches, canUpd
   const [manualConfirmed, setManualConfirmed] = useState(false);
   const [manualPending, setManualPending] = useState(false);
   const [manualFeedback, setManualFeedback] = useState("");
+  const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([]);
+  const [addedMessageIds, setAddedMessageIds] = useState<string[]>([]);
+  const lineMessages = useMemo(() => tenantLineTextMessages(tenantMessages), [tenantMessages]);
+  const photos = useMemo(() => uniqueDispatchPhotos([
+    ...repairPhotos.map((photo, index) => ({ id: `repair:${photo.id ?? index}`, url: photo.photo_url,
+      source: "入居者フォーム" as const, sourceType: "repair_photo" as const,
+      sourceId: photo.id, selectedByDefault: !!photo.id })),
+    ...(repairPhotos.length ? [] : fallbackPhotoUrl ? [{ id: "repair:fallback", url: fallbackPhotoUrl,
+      source: "不明" as const, sourceType: "legacy_photo" as const, selectedByDefault: false }] : []),
+    ...tenantMessages.filter((item) => item.channel === "line" && item.sender_type === "tenant" &&
+      item.attachment?.media_type === "image" && !item.attachment.outbound).map((item) => ({
+      id: `line:${item.attachment!.id}`,
+      url: `/api/admin/line-attachments/${encodeURIComponent(item.attachment!.id)}/open?repairId=${repairId}`,
+      source: "入居者LINE" as const, sourceType: "tenant_line_attachment" as const,
+      sourceId: item.attachment!.id, createdAt: item.created_at, selectedByDefault: true,
+    })),
+  ]), [repairPhotos, fallbackPhotoUrl, tenantMessages, repairId]);
   const categories = useMemo(() => [...new Set(candidates.flatMap((vendor) => vendor.categories))].sort(), [candidates]);
   const areas = useMemo(() => [...new Map(candidates.flatMap((vendor) => vendor.areas)
     .map((item) => [item.areaCode, item])).values()].sort((a, b) => a.areaLabel.localeCompare(b.areaLabel, "ja")), [candidates]);
@@ -116,8 +126,14 @@ export function VendorDispatchSection({ repairId, candidates, dispatches, canUpd
   function beginManual(dispatch: VendorDispatchHistory) {
     setManualDispatchId(dispatch.id);
     setManualRequestId(crypto.randomUUID());
-    setManualBody(manualMessageDraft(dispatch, { propertyName, roomNumber, category: repairCategory,
-      description: repairDescription, managementCompanyName }));
+    const initialPhotos = photos.filter((photo) => photo.selectedByDefault).map((photo) => photo.id);
+    setSelectedPhotoIds(initialPhotos);
+    setAddedMessageIds([]);
+    setManualBody(manualMessageDraft({ vendorName: dispatch.vendorName, contactName: dispatch.vendorContactName,
+      propertyName, roomNumber, category: repairCategory, report: repairDescription,
+      instructions: managementRequest(dispatch.instructions, propertyName, roomNumber, repairDescription),
+      managementCompanyName, additionalMessages: [],
+      photoCount: initialPhotos.length }));
     setManualConfirmed(false);
     setManualFeedback("");
   }
@@ -127,6 +143,8 @@ export function VendorDispatchSection({ repairId, candidates, dispatches, canUpd
     setManualRequestId("");
     setManualBody("");
     setManualConfirmed(false);
+    setSelectedPhotoIds([]);
+    setAddedMessageIds([]);
     setManualFeedback("");
   }
   async function copyManualBody() {
@@ -143,7 +161,10 @@ export function VendorDispatchSection({ repairId, candidates, dispatches, canUpd
     setManualFeedback("");
     try {
       const result = await confirmManualVendorDispatch({ repairId, dispatchId: manualDispatchId,
-        requestId: manualRequestId, messageBody: manualBody, externalDeliveryConfirmed: true });
+        requestId: manualRequestId, messageBody: manualBody, externalDeliveryConfirmed: true,
+        photos: photos.filter((photo) => selectedPhotoIds.includes(photo.id)).map((photo) => ({
+          sourceType: photo.sourceType, sourceId: photo.sourceId ?? null,
+        })) });
       if (!result.ok) {
         setManualFeedback(result.message);
         if (result.loginRequired) window.location.assign("/admin/login");
@@ -195,6 +216,13 @@ export function VendorDispatchSection({ repairId, candidates, dispatches, canUpd
           <p className="font-bold">手配済み ・ {item.channel === "manual" ? "手動送信" : item.channel}</p>
           <p className="text-xs">{item.sentAt ? formatDate(item.sentAt) : "日時未確定"} ・ 担当：{item.sentByName}</p>
           <p className="text-xs">送信記録：{item.deliveryStatus === "manual_confirmed" ? "スタッフ確認済み" : item.deliveryStatus}</p>
+          {item.photoSelectionRecorded ? <details className="mt-1"><summary className="cursor-pointer text-xs font-bold">
+            送信対象として記録した写真：{item.attachments?.length ?? 0}枚</summary>
+            <ul className="ml-4 list-disc text-xs">{item.attachments?.map((photo) => <li key={photo.id}>
+              {photo.sourceType === "repair_photo" ? "入居者フォーム" :
+                photo.sourceType === "tenant_line_attachment" ? "入居者LINE" : "旧写真（監査用参照）"}
+            </li>)}</ul>
+          </details> : <p className="text-xs">旧履歴：写真選択の記録なし</p>}
         </div>)}
       </div>}
       {canUpdate && dispatch.status === "candidate" && manualDispatchId !== dispatch.id && <button
@@ -212,11 +240,44 @@ export function VendorDispatchSection({ repairId, candidates, dispatches, canUpd
           <div><dt className="text-xs font-bold text-slate-500">連絡先</dt><dd>{[dispatch.vendorPhone, dispatch.vendorEmail].filter(Boolean).join(" / ") || "未登録"}</dd></div>
           <div><dt className="text-xs font-bold text-slate-500">物件・号室</dt><dd>{propertyName} {roomNumber}号室</dd></div>
           <div><dt className="text-xs font-bold text-slate-500">修繕カテゴリ</dt><dd>{repairCategory}</dd></div>
-          <div className="sm:col-span-2"><dt className="text-xs font-bold text-slate-500">修繕内容</dt><dd>{repairDescription}</dd></div>
-          <div className="sm:col-span-2"><dt className="text-xs font-bold text-slate-500">手配内容</dt><dd>{dispatch.instructions}</dd></div>
-          <div><dt className="text-xs font-bold text-slate-500">写真枚数</dt><dd>{photoCount}枚</dd></div>
+          {repairDescription.trim() && <div className="sm:col-span-2"><dt className="text-xs font-bold text-slate-500">【入居者申告】</dt><dd className="whitespace-pre-wrap">{repairDescription}</dd></div>}
+          <div className="sm:col-span-2"><dt className="text-xs font-bold text-slate-500">【管理会社からの依頼】</dt><dd className="whitespace-pre-wrap">{managementRequest(dispatch.instructions, propertyName, roomNumber, repairDescription)}</dd></div>
+          <div><dt className="text-xs font-bold text-slate-500">手動送信時に使用する写真</dt><dd>{selectedPhotoIds.length}枚</dd></div>
           <div><dt className="text-xs font-bold text-slate-500">管理会社名</dt><dd>{managementCompanyName}</dd></div>
         </dl>
+        {lineMessages.length > 0 && <section className="mt-3 rounded-lg border p-3">
+          <h5 className="text-sm font-bold">入居者からの追加メッセージ</h5>
+          <ul className="mt-2 space-y-2">{lineMessages.map((item) => <li key={item.id} className="rounded-lg bg-slate-50 p-2 text-sm">
+            <p className="text-xs text-slate-600">入居者LINE ・ {formatDate(item.created_at)}</p>
+            <p className="whitespace-pre-wrap">{item.message}</p>
+            <button type="button" disabled={addedMessageIds.includes(item.id) ||
+              manualBody.length + `\n\n【入居者からの追加連絡】\n${item.message.trim()}`.length > 10000} onClick={() => {
+              setManualBody((body) => `${body}\n\n【入居者からの追加連絡】\n${item.message.trim()}`);
+              setAddedMessageIds((ids) => [...ids, item.id]);
+            }} className="mt-1 text-xs font-bold text-blue-700 underline disabled:text-slate-400">
+              {addedMessageIds.includes(item.id) ? "追加済み" : "本文へ追加"}</button>
+          </li>)}</ul>
+        </section>}
+        <section className="mt-3 rounded-lg border p-3">
+          <h5 className="text-sm font-bold">写真</h5>
+          <p className="text-xs text-slate-600">手動送信時に使用する写真を選択してください。画像はこの画面から送信されません。</p>
+          {photos.length === 0 ? <p className="mt-2 text-sm text-slate-500">写真はありません。</p> :
+            <ul className="mt-2 grid gap-2 sm:grid-cols-3">{photos.map((photo) => <li key={photo.id} className="rounded-lg border p-2">
+              <label className="block cursor-pointer text-xs">
+                {/* Existing photo and LINE routes already enforce repair and organization scope. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photo.url} alt={`${photo.source}の修繕写真`} className="mb-2 h-24 w-full rounded object-cover" />
+                <span className="flex items-center gap-2"><input type="checkbox" checked={selectedPhotoIds.includes(photo.id)}
+                  disabled={photo.sourceType !== "legacy_photo" && !photo.sourceId}
+                  onChange={(event) => {
+                    const next = event.target.checked ? [...selectedPhotoIds, photo.id] : selectedPhotoIds.filter((id) => id !== photo.id);
+                    setSelectedPhotoIds(next);
+                    setManualBody((body) => updateDraftPhotoCount(body, next.length));
+                  }} />{photo.source}</span>
+                {photo.createdAt && <time dateTime={photo.createdAt}>{formatDate(photo.createdAt)}</time>}
+              </label>
+            </li>)}</ul>}
+        </section>
         <label className="mt-3 block text-sm font-bold text-slate-700">送信用本文
           <textarea value={manualBody} onChange={(event) => setManualBody(event.target.value)}
             maxLength={10000} rows={12} className="mt-1 w-full rounded-lg border p-3 font-normal" /></label>

@@ -18,7 +18,7 @@ export async function getAdminRepairs(context: Extract<Awaited<ReturnType<typeof
     throw new Error("案件の閲覧権限を確認できませんでした。");
   }
   const { data: photos, error: photoError } = await supabase.from("repair_photos")
-    .select("repair_id, organization_id, photo_url, storage_path, sort_order")
+    .select("id::text, repair_id, organization_id, photo_url, storage_path, sort_order")
     .eq("organization_id", organizationId)
     .in("repair_id", data.map((repair) => repair.id))
     .order("sort_order", { ascending: true });
@@ -33,7 +33,7 @@ export async function getAdminRepairs(context: Extract<Awaited<ReturnType<typeof
     if (photo.storage_path || photo.photo_url) withPhotos.add(photo.repair_id);
     try {
       const url = await resolveRepairPhotoUrl(photo, organizationId, photo.repair_id);
-      if (url) (grouped[photo.repair_id] ??= []).push({ repair_id: photo.repair_id, photo_url: url, sort_order: photo.sort_order });
+      if (url) (grouped[photo.repair_id] ??= []).push({ id: photo.id, repair_id: photo.repair_id, photo_url: url, sort_order: photo.sort_order });
     } catch (error) {
       if (!(error instanceof PhotoUnavailableError)) throw error;
       unavailable.add(photo.repair_id);
