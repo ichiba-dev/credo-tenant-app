@@ -12,6 +12,7 @@ import EstimateSection from "./estimate-section";
 import { MessageSection } from "./message-section";
 import { VendorQuoteUploadForm } from "./vendor-quote-upload-form";
 import Link from "next/link";
+import RepairList from "./repair-list";
 import { VendorDispatchSection } from "./vendor-dispatch-section";
 
 function getDisplayPhotos(repair: {
@@ -81,7 +82,7 @@ export default function AdminRepairs({ repairs, canUpdate, children, replyScope 
     await save(id, "comment", comments[id] ?? repairs.find((repair) => repair.id === id)?.staff_comment ?? "");
   }
   return (
-    <main className="min-h-screen bg-gray-100 p-6">
+    <main className="min-h-screen bg-gray-100 p-3 sm:p-6">
       <div className="mx-auto max-w-5xl">
         <nav className="mb-5 flex justify-end">
           <Link href="/admin/vendors" className="rounded-lg bg-blue-950 px-4 py-2 font-bold text-white shadow hover:bg-blue-900">業者マスタ</Link>
@@ -98,15 +99,8 @@ export default function AdminRepairs({ repairs, canUpdate, children, replyScope 
 
         <p role="status" className="mt-3 text-sm">{isSaving ? "保存中…" : message}</p>
         {!canUpdate && <p className="mt-3 text-sm">閲覧専用です。ステータス・コメントは更新できません。</p>}
-        <div className="mt-8 rounded-xl bg-white p-6 shadow">
-
-         {repairs
-           .filter((repair) => repair.property_name)
-           .map((repair) => (
-           <div
-             key={repair.id}
-             className="border-b py-4"
-           >
+        <RepairList repairs={repairs} renderDetail={(repair) => (
+           <div>
              <p className="font-bold">
                {repair.property_name} {repair.room_number}号室
              </p>
@@ -231,9 +225,7 @@ export default function AdminRepairs({ repairs, canUpdate, children, replyScope 
             </button>
             </div>
             </div>
-          ))}
-          
-        </div>
+          )} />
 
         
       </div>
