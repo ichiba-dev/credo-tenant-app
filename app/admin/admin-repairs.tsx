@@ -84,7 +84,8 @@ export default function AdminRepairs({ repairs, canUpdate, children, replyScope 
   return (
     <main className="min-h-screen bg-gray-100 p-3 sm:p-6">
       <div className="mx-auto max-w-5xl">
-        <nav className="mb-5 flex justify-end">
+        <nav className="mb-5 flex flex-wrap justify-end gap-2">
+          <Link href="/admin/calendar" className="rounded-lg bg-blue-950 px-4 py-2 font-bold text-white shadow hover:bg-blue-900">カレンダー</Link>
           <Link href="/admin/vendors" className="rounded-lg bg-blue-950 px-4 py-2 font-bold text-white shadow hover:bg-blue-900">業者マスタ</Link>
         </nav>
         {children}

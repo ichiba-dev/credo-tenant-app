@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import CalendarEventForm from "./calendar-event-form";
 import { confirmManualVendorDispatch, selectRepairVendor } from "./vendor-dispatch-actions";
 import type { RepairPhoto, TenantRepairMessage, VendorCandidate, VendorDispatchHistory } from "./types";
 import { managementRequest, manualMessageDraft, tenantLineTextMessages, uniqueDispatchPhotos, updateDraftPhotoCount } from "./vendor-dispatch-compose";
@@ -190,6 +191,7 @@ export function VendorDispatchSection({ repairId, candidates, dispatches, canUpd
         className="rounded-lg bg-[#0b1f3a] px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-[#15365f]">
         業者を追加手配</button>}
     </div>
+    {canUpdate && <CalendarEventForm repairId={repairId}/>}
     {unavailable && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-800">
       業者手配情報を取得できませんでした。時間をおいて再読み込みしてください。</p>}
     {!unavailable && dispatches.length === 0 && !open && <p className="mt-3 text-sm text-slate-500">
@@ -210,6 +212,7 @@ export function VendorDispatchSection({ repairId, candidates, dispatches, canUpd
         <div className="sm:col-span-2"><dt className="text-xs font-bold text-slate-500">手配内容</dt>
           <dd className="mt-1 whitespace-pre-wrap rounded-lg bg-slate-50 p-3">{dispatch.instructions}</dd></div>
       </dl>
+      {canUpdate && dispatch.status !== "cancelled" && <CalendarEventForm repairId={repairId} dispatchId={dispatch.id}/>}
       {dispatch.messages.length > 0 && <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
         <p className="text-xs font-bold text-emerald-900">送信記録</p>
         {dispatch.messages.map((item) => <div key={item.id} className="mt-2 text-sm text-emerald-950">

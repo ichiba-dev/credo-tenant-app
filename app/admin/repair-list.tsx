@@ -17,6 +17,17 @@ export default function RepairList({repairs, renderDetail}: {repairs: AdminRepai
   const [visited,setVisited] = useState<Set<number>>(() => new Set());
   const [jumpId,setJumpId] = useState<number | null>(null);
   useEffect(() => {
+    const followHash = () => {
+      const match = /^#repair-detail-(\d+)$/.exec(window.location.hash);
+      const id = match ? Number(match[1]) : 0;
+      if (!repairs.some(repair => repair.id === id)) return;
+      setFilter("all"); setSearch("");
+      setVisited(previous => new Set(previous).add(id)); setJumpId(id);
+    };
+    followHash();window.addEventListener("hashchange",followHash);
+    return () => window.removeEventListener("hashchange",followHash);
+  }, [repairs]);
+  useEffect(() => {
     if (jumpId === null) return;
     openRepairDetails(document, jumpId);
     setJumpId(null);
