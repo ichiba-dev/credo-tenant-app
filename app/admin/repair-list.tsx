@@ -16,6 +16,7 @@ export default function RepairList({repairs, renderDetail}: {repairs: AdminRepai
   const groups = useMemo(() => groupRepairs(repairs),[repairs]);
   const visible = (repair: AdminRepair) => matchesRepairFilter(repairListState(repair),filter) && matchesRepairSearch(repair,search);
   const visibleCount = repairs.filter(visible).length;
+  const countLabel = filter === "active" ? "未完了" : filter === "all" ? "表示" : filters.find(item => item.key === filter)?.label;
   return <section className="mt-5" aria-label="修理案件一覧">
     <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
       {filters.map(item => <button key={item.key} type="button" aria-pressed={filter===item.key}
@@ -40,7 +41,7 @@ export default function RepairList({repairs, renderDetail}: {repairs: AdminRepai
         const count = group.repairs.filter(visible).length;
         return <div key={group.property} hidden={count===0}>
           <details open className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-            <summary className="cursor-pointer bg-[#0b2e59] px-4 py-3 text-sm font-bold text-white">{group.property}<span className="ml-3 font-normal">{count}件{count!==group.repairs.length && ` / 全${group.repairs.length}件`}</span></summary>
+            <summary className="cursor-pointer bg-[#0b2e59] px-4 py-3 text-sm font-bold text-white">{group.property}<span className="ml-3 font-normal">{countLabel}{count} / 全{group.repairs.length}{search.trim() && "（検索一致分）"}</span></summary>
             {group.repairs.map(repair => {
               const state = repairListState(repair);
               return <div key={repair.id} hidden={!visible(repair)} className="border-t border-slate-100">

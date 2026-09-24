@@ -14,6 +14,7 @@ import type { UnassignedLineAttachment } from "./types";
 import { getLinkedLineAttachments } from "./linked-line-attachment-data";
 import { getOutboundAttachments } from "./outbound-attachment-data";
 import { getVendorDispatchData } from "./vendor-dispatch-data";
+import UnassignedLineNotice from "./unassigned-line-notice";
 
 export default async function AdminPage() {
   const context = await getStaffContext();
@@ -66,7 +67,10 @@ export default async function AdminPage() {
     repairs = repairs.map((repair) => ({ ...repair, vendor_dispatch_unavailable: true }));
   }
   return <AdminRepairs key={context.organizationId} repairs={repairs} canUpdate={context.canUpdate} replyScope={`${context.organizationId}:${context.userId}`}>
-    <LineMessageSection messages={lineMessages} unavailable={lineMessagesUnavailable} canUpdate={context.canUpdate} />
-    <LineAttachmentSection attachments={attachments} unavailable={attachmentsUnavailable} canUpdate={context.canUpdate} />
+    <UnassignedLineNotice messageCount={lineMessages.length} attachmentCount={attachments.length}
+      messagesUnavailable={lineMessagesUnavailable} attachmentsUnavailable={attachmentsUnavailable}>
+      {(lineMessages.length > 0 || lineMessagesUnavailable) && <LineMessageSection messages={lineMessages} unavailable={lineMessagesUnavailable} canUpdate={context.canUpdate} />}
+      {(attachments.length > 0 || attachmentsUnavailable) && <LineAttachmentSection attachments={attachments} unavailable={attachmentsUnavailable} canUpdate={context.canUpdate} />}
+    </UnassignedLineNotice>
   </AdminRepairs>;
 }

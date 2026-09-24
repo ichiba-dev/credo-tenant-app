@@ -67,3 +67,36 @@ test('empty UI is usable and existing detail integration retains feature compone
   assert.ok(integration.includes('<'+component));
  assert.ok(integration.includes('renderDetail='));
 });
+
+test('property counts identify the active filter and search scope',()=>{
+ for (const [selected,label] of [['active','未完了1 / 全2'],['attention','要対応1 / 全2'],['arranging','手配中0 / 全2'],['estimate','見積待ち0 / 全2'],['completed','完了1 / 全2'],['all','表示2 / 全2']]) {
+  let call=0;
+  const react={...React,useState:()=>[call++===0 ? selected : call===2 ? '' : new Set(),()=>{}]};
+  const Component=load('./repair-list.tsx',{'react':react,'react/jsx-runtime':jsx,'./repair-list-state':helper}).default;
+  const html=renderToStaticMarkup(React.createElement(Component,{repairs:[base,{...base,id:2,status:'完了'}],renderDetail:()=>null}));
+  assert.ok(html.includes(label),label);
+ }
+ let call=0;
+ const react={...React,useState:()=>[call++===0 ? 'all' : call===2 ? '302' : new Set(),()=>{}]};
+ const Component=load('./repair-list.tsx',{'react':react,'react/jsx-runtime':jsx,'./repair-list-state':helper}).default;
+ const html=renderToStaticMarkup(React.createElement(Component,{repairs:[base,{...base,id:2,room_number:'405'}],renderDetail:()=>null}));
+ assert.ok(html.includes('表示1 / 全2（検索一致分）'));
+});
+
+test('unassigned LINE notice hides zero counts, preserves operations and distinguishes errors',()=>{
+ const Notice=load('./unassigned-line-notice.tsx',{'react/jsx-runtime':jsx}).default;
+ const props={messageCount:0,attachmentCount:0,messagesUnavailable:false,attachmentsUnavailable:false};
+ const render=(extra={})=>renderToStaticMarkup(React.createElement(Notice,{...props,...extra},React.createElement('button',null,'既存割当操作')));
+ assert.equal(render(),'');
+ for(const counts of [{messageCount:3},{attachmentCount:1},{messageCount:3,attachmentCount:1}]) {
+  const html=render(counts);
+  assert.match(html,/<details/);assert.doesNotMatch(html,/<details[^>]* open/);
+  assert.match(html,/既存割当操作/);
+ }
+ assert.match(render({messageCount:3,attachmentCount:1}),/メッセージ3件 \/ 添付1件/);
+ assert.match(render({messagesUnavailable:true}),/メッセージ取得不可/);
+ assert.match(render({attachmentsUnavailable:true}),/添付取得不可/);
+ const page=readFileSync(new URL('./page.tsx',import.meta.url),'utf8');
+ assert.ok(page.includes('(lineMessages.length > 0 || lineMessagesUnavailable) && <LineMessageSection'));
+ assert.ok(page.includes('(attachments.length > 0 || attachmentsUnavailable) && <LineAttachmentSection'));
+});
