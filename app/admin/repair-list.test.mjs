@@ -10,7 +10,12 @@ function load(name, imports={}) {
  const exports={};
  vm.runInNewContext(ts.transpileModule(readFileSync(new URL(name,import.meta.url),'utf8'),
   {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,
-  {exports,require:(name)=>{if(name in imports)return imports[name];throw new Error(name);}});
+  {exports,require:(name)=>{
+   if(name in imports)return imports[name];
+   if(name==='./repair-todo-state')return load('./repair-todo-state.ts',{'./repair-list-state':helper});
+   if(name==='./repair-todos')return load('./repair-todos.tsx',{'react':React,'react/jsx-runtime':jsx});
+   throw new Error(name);
+  }});
  return exports;
 }
 const helper=load('./repair-list-state.ts');
@@ -23,6 +28,57 @@ test('unassigned and candidates explain attention; completed wins over stale dis
  assert.ok(state({...base,vendor_dispatches:[dispatch('candidate')]}).reasons.includes('手配候補'));
  const done=state({...base,status:'完了',vendor_dispatches:[dispatch('candidate')]});
  assert.equal(done.attention,false);assert.equal(filter(done,'active'),false);assert.equal(filter(done,'completed'),true);
+});
+
+const todoHelper=load('./repair-todo-state.ts',{'./repair-list-state':helper});
+const now=Date.parse('2026-09-24T00:00:00Z');
+test('todo rules use known dispatches, exclude completed and never infer vendor quote absence',()=>{
+ const todos=(repair)=>todoHelper.repairTodos([repair],now);
+ assert.equal(todos(base)[0].primary.key,'unassigned');
+ assert.equal(todos({...base,vendor_dispatches:[dispatch('candidate')],status:'見積待ち'})[0].primary.key,'candidate');
+ const fresh={...base,created_at:'2026-09-24T00:00:00Z'};
+ for(const status of ['dispatched','cancelled'])assert.equal(todos({...fresh,vendor_dispatches:[dispatch(status)]}).length,0);
+ assert.equal(todos({...fresh,vendor_dispatch_unavailable:true}).length,0);
+ assert.equal(todos({...fresh,vendor_dispatches:undefined}).length,0);
+ assert.equal(todos({...base,status:'完了'}).length,0);
+ assert.equal(todos({...fresh,status:'見積待ち',vendor_dispatches:[dispatch('dispatched')]})[0].primary.key,'estimate');
+});
+test('todo stale threshold is inclusive, uses latest known activity and deduplicates conditions',()=>{
+ const repair={...base,created_at:new Date(now-todoHelper.STALE_REPAIR_DAYS*86400000).toISOString(),vendor_dispatches:[]};
+ const item=todoHelper.repairTodos([repair],now);
+ assert.equal(item.length,1);assert.equal(item[0].primary.key,'unassigned');
+ assert.ok(item[0].reasons.some(r=>r.key==='stale'));
+ assert.equal(todoHelper.repairTodos([repair],now-1)[0].reasons.some(r=>r.key==='stale'),false);
+ assert.equal(todoHelper.repairTodos([{...repair,tenant_messages:[{created_at:new Date(now).toISOString()}]}],now)[0].reasons.some(r=>r.key==='stale'),false);
+ assert.equal(todoHelper.repairTodos([{...repair,created_at:'bad',vendor_dispatches:[{...dispatch('dispatched'),selectedAt:'bad'}]}],now).length,0);
+ const onlyStale={...base,id:3,vendor_dispatches:[dispatch('dispatched')]};
+ const candidate={...base,id:2,vendor_dispatches:[dispatch('candidate')]};
+ assert.deepEqual(Array.from(todoHelper.repairTodos([onlyStale,candidate,base],now),t=>t.repair.id),[1,2,3]);
+});
+test('todo jump opens property and repair, focuses and scrolls the existing detail',()=>{
+ const group={open:false};let focused=false,scrolled=false;
+ const detail={open:false,parentElement:{closest:()=>group},querySelector:()=>({focus:()=>{focused=true;}}),scrollIntoView:()=>{scrolled=true;}};
+ todoHelper.openRepairDetails({getElementById:(id)=>{assert.equal(id,'repair-detail-1');return detail;}},1);
+ assert.equal(group.open,true);assert.equal(detail.open,true);assert.ok(focused&&scrolled);
+ assert.doesNotThrow(()=>todoHelper.openRepairDetails({getElementById:()=>null},9));
+ let index=0;const values=[];
+ const MockList=load('./repair-list.tsx',{'react':{...React,useEffect:()=>{},useMemo:fn=>fn(),useState:initial=>{
+  const i=index++;return [typeof initial==='function'?initial():initial,value=>{values[i]=typeof value==='function'?value(new Set()):value;}];
+ }},'react/jsx-runtime':jsx,'./repair-list-state':helper}).default;
+ const tree=MockList({repairs:[base],renderDetail:()=>null});
+ tree.props.children[0].props.onSelect(1);
+ assert.equal(values[0],'all');assert.equal(values[1],'');assert.ok(values[2].has(1));assert.equal(values[3],1);
+});
+test('todo empty states and condition filter retain one row per repair',()=>{
+ const Todo=load('./repair-todos.tsx',{'react':React,'react/jsx-runtime':jsx}).default;
+ for(const repairs of [[],[{...base,status:'完了'}]]) {
+  const html=renderToStaticMarkup(React.createElement(Todo,{repairs,onSelect:()=>{}}));
+  assert.match(html,/今日やること/);assert.match(html,/現在、判定できるやることはありません/);
+ }
+ let i=0;
+ const TodoFiltered=load('./repair-todos.tsx',{'react':{...React,useState:()=>[i++===0?'stale':now,()=>{}]},'react/jsx-runtime':jsx}).default;
+ const html=renderToStaticMarkup(React.createElement(TodoFiltered,{repairs:[base],onSelect:()=>{}}));
+ assert.equal((html.match(/<li>/g)||[]).length,1);assert.match(html,/3日以上更新なし/);
 });
 test('requested and scheduling reflect known stages, never inferred quote or vendor reply waits',()=>{
  const sent=state({...base,status:'手配中',vendor_dispatches:[dispatch('dispatched')]});

@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import RepairTodos from "./repair-todos";
+import { openRepairDetails } from "./repair-todo-state";
 import type { AdminRepair } from "./types";
 import { groupRepairs, matchesRepairFilter, matchesRepairSearch, repairListState, type RepairFilter } from "./repair-list-state";
 
@@ -13,11 +15,23 @@ export default function RepairList({repairs, renderDetail}: {repairs: AdminRepai
   const [filter,setFilter] = useState<RepairFilter>("active");
   const [search,setSearch] = useState("");
   const [visited,setVisited] = useState<Set<number>>(() => new Set());
+  const [jumpId,setJumpId] = useState<number | null>(null);
+  useEffect(() => {
+    if (jumpId === null) return;
+    openRepairDetails(document, jumpId);
+    setJumpId(null);
+  }, [jumpId]);
   const groups = useMemo(() => groupRepairs(repairs),[repairs]);
   const visible = (repair: AdminRepair) => matchesRepairFilter(repairListState(repair),filter) && matchesRepairSearch(repair,search);
   const visibleCount = repairs.filter(visible).length;
   const countLabel = filter === "active" ? "未完了" : filter === "all" ? "表示" : filters.find(item => item.key === filter)?.label;
   return <section className="mt-5" aria-label="修理案件一覧">
+    <RepairTodos repairs={repairs} onSelect={id => {
+      setFilter("all"); setSearch("");
+      setVisited(previous => new Set(previous).add(id));
+      setJumpId(id);
+    }} />
+    <h2 className="mb-3 font-bold text-[#0b2e59]">修理依頼一覧</h2>
     <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
       {filters.map(item => <button key={item.key} type="button" aria-pressed={filter===item.key}
         onClick={() => setFilter(item.key)} className={`rounded-xl border p-3 text-left ${filter===item.key ? "border-[#0b2e59] bg-[#0b2e59] text-white" : "border-slate-200 bg-white text-[#0b2e59]"}`}>
@@ -45,7 +59,7 @@ export default function RepairList({repairs, renderDetail}: {repairs: AdminRepai
             {group.repairs.map(repair => {
               const state = repairListState(repair);
               return <div key={repair.id} hidden={!visible(repair)} className="border-t border-slate-100">
-                <details onToggle={event => {if(event.currentTarget.open) setVisited(previous => new Set(previous).add(repair.id));}}>
+                <details id={`repair-detail-${repair.id}`} onToggle={event => {if(event.currentTarget.open) setVisited(previous => new Set(previous).add(repair.id));}}>
                   <summary className="cursor-pointer list-none px-4 py-3 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-blue-700">
                     <span className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)_auto] md:items-center">
                       <span className="min-w-0"><span className="block font-bold text-[#0b2e59]">{repair.room_number || "号室未登録"}{repair.room_number && "号室"}</span><span className="block truncate text-xs text-slate-600">{repair.tenant_name || "入居者名未登録"}</span></span>
