@@ -76,9 +76,38 @@ test('todo empty states and condition filter retain one row per repair',()=>{
   assert.match(html,/今日やること/);assert.match(html,/現在、判定できるやることはありません/);
  }
  let i=0;
- const TodoFiltered=load('./repair-todos.tsx',{'react':{...React,useState:()=>[i++===0?'stale':now,()=>{}]},'react/jsx-runtime':jsx}).default;
+ const TodoFiltered=load('./repair-todos.tsx',{'react':{...React,useState:()=>[['stale',now,false][i++],()=>{}]},'react/jsx-runtime':jsx}).default;
  const html=renderToStaticMarkup(React.createElement(TodoFiltered,{repairs:[base],onSelect:()=>{}}));
- assert.equal((html.match(/<li>/g)||[]).length,1);assert.match(html,/3日以上更新なし/);
+ assert.equal((html.match(/<li>/g)||[]).length,0);assert.match(html,/この条件に該当する案件はありません/);
+});
+
+test('todo primary counts are exclusive, stale is supplemental, and five rows expand and collapse',()=>{
+ let index=0;const state=['all',now,false];let selected;
+ const Todo=load('./repair-todos.tsx',{'react':{...React,useEffect:()=>{},useState:()=>{
+  const slot=index++;return [state[slot],value=>{state[slot]=typeof value==='function'?value(state[slot]):value;}];
+ }},'react/jsx-runtime':jsx}).default;
+ const repairs=Array.from({length:19},(_,i)=>({...base,id:i+1}));
+ const render=(rows=repairs)=>{index=0;return Todo({repairs:rows,onSelect:id=>{selected=id;}});};
+ const buttons=node=> !node || typeof node!=='object' ? [] : Array.isArray(node) ? node.flatMap(buttons) :
+  [...(node.type==='button'?[node]:[]),...buttons(node.props?.children)];
+ let tree=render();let html=renderToStaticMarkup(tree);
+ assert.equal((html.match(/<li>/g)||[]).length,5);
+ assert.match(html,/業者未手配 19/);assert.match(html,/3日以上更新なし 0/);assert.match(html,/残り14件を見る/);
+ assert.match(html,/bg-slate-100[^>]*>3日以上更新なし/);
+ let actions=buttons(tree);actions.find(b=>b.props.children==='残り14件を見る').props.onClick();
+ tree=render();html=renderToStaticMarkup(tree);assert.equal((html.match(/<li>/g)||[]).length,19);
+ buttons(tree).find(b=>b.props.children==='最初の5件に戻す').props.onClick();
+ tree=render();assert.equal((renderToStaticMarkup(tree).match(/<li>/g)||[]).length,5);
+ buttons(tree).find(b=>b.props.className.includes('grid w-full')).props.onClick();assert.equal(selected,1);
+ state[2]=true;buttons(tree)[1].props.onClick();assert.equal(state[0],'unassigned');assert.equal(state[2],false);
+ state[0]='all';
+ for(const n of [0,5])assert.doesNotMatch(renderToStaticMarkup(render(repairs.slice(0,n))),/残り\d+件を見る/);
+ assert.match(renderToStaticMarkup(render(repairs.slice(0,6))),/残り1件を見る/);
+ const mixed=[base,{...base,id:20,status:'見積待ち',vendor_dispatches:[dispatch('candidate')]},
+  {...base,id:21,vendor_dispatches:[dispatch('dispatched')]}];
+ html=renderToStaticMarkup(render(mixed));
+ assert.match(html,/業者未手配 1/);assert.match(html,/手配候補 1/);assert.match(html,/見積待ち 0/);assert.match(html,/3日以上更新なし 1/);
+ state[0]='stale';assert.equal((renderToStaticMarkup(render(mixed)).match(/<li>/g)||[]).length,1);
 });
 test('requested and scheduling reflect known stages, never inferred quote or vendor reply waits',()=>{
  const sent=state({...base,status:'手配中',vendor_dispatches:[dispatch('dispatched')]});
