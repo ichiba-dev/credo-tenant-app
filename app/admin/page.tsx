@@ -73,8 +73,9 @@ export default async function AdminPage() {
   let calendarEvents;
   try {calendarEvents=await getCalendarEvents(context,null,`${nextDay(today,2)}T00:00:00+09:00`);}
   catch {calendarEvents=null;}
-  return <AdminRepairs key={context.organizationId} repairs={repairs} canUpdate={context.canUpdate} replyScope={`${context.organizationId}:${context.userId}`}>
-    {calendarEvents?<CalendarOverview events={calendarEvents} initialNow={now} canUpdate={context.canUpdate}/>:<p role="alert" className="mb-3 text-sm text-slate-600">予定を取得できませんでした。再読み込みして確認してください。</p>}
+  return <AdminRepairs key={context.organizationId} repairs={repairs} canUpdate={context.canUpdate} replyScope={`${context.organizationId}:${context.userId}`} calendarOverview={
+    calendarEvents?<CalendarOverview events={calendarEvents} initialNow={now} canUpdate={context.canUpdate}/>:<p role="alert" className="mb-3 text-sm text-slate-600">予定を取得できませんでした。再読み込みして確認してください。</p>
+  }>
     <UnassignedLineNotice messageCount={lineMessages.length} attachmentCount={attachments.length}
       messagesUnavailable={lineMessagesUnavailable} attachmentsUnavailable={attachmentsUnavailable}>
       {(lineMessages.length > 0 || lineMessagesUnavailable) && <LineMessageSection messages={lineMessages} unavailable={lineMessagesUnavailable} canUpdate={context.canUpdate} />}

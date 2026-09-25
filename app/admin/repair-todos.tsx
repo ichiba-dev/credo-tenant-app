@@ -17,7 +17,7 @@ export default function RepairTodos({ repairs, onSelect }: { repairs: AdminRepai
   const todos = repairTodos(repairs, now);
   const visible = todos.filter(todo => filter === "all" || todo.primary.key === filter);
   const displayed = expanded ? visible : visible.slice(0, 5);
-  return <section aria-labelledby="repair-todos-heading" className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
+  return <section aria-labelledby="repair-todos-heading" className="mb-6 rounded-xl border border-slate-200 bg-white p-4 xl:mb-3 xl:p-3">
     <h2 id="repair-todos-heading" className="font-bold text-[#0b2e59]">今日やること <span className="ml-2">{todos.length}件</span></h2>
     <div className="mt-3 flex flex-wrap gap-2">
       {[{ key: "all", label: "すべて" }, ...TODO_RULES].map(rule => <button key={rule.key} type="button"
@@ -29,7 +29,7 @@ export default function RepairTodos({ repairs, onSelect }: { repairs: AdminRepai
     <p className="mt-2 text-xs text-slate-500">件数は主な対応理由ごとに集計。更新停滞の件数は他の対応理由がない案件のみです。更新日時は取得済み履歴の最新日時です。</p>
     {visible.length === 0 ? <p className="mt-3 text-sm text-slate-600">{todos.length === 0 ? "現在、判定できるやることはありません。" : "この条件に該当する案件はありません。"}</p> :
       <ul className="mt-3 divide-y divide-slate-100">{displayed.map(todo => <li key={todo.repair.id}>
-        <button type="button" onClick={() => onSelect(todo.repair.id)} className="grid w-full gap-1 rounded px-2 py-3 text-left hover:bg-slate-50 focus-visible:outline-blue-700 sm:grid-cols-[1fr_1fr_auto]">
+        <button type="button" onClick={() => onSelect(todo.repair.id)} className="grid w-full gap-1 rounded px-2 py-3 text-left hover:bg-slate-50 focus-visible:outline-blue-700 sm:grid-cols-[1fr_1fr_auto] xl:grid-cols-1 xl:px-1 xl:py-2">
           <span className="min-w-0"><span className="block truncate text-sm font-semibold text-[#0b2e59]">{todo.repair.property_name || "物件名未登録"} {todo.repair.room_number ? `${todo.repair.room_number}号室` : "号室未登録"}</span><span className="text-xs text-slate-600">{todo.repair.category || "カテゴリ未登録"}</span></span>
           <span className="min-w-0"><span className="block truncate text-sm">{todo.repair.description || "内容未登録"}</span><span className="text-xs font-medium text-[#0b2e59]">{todo.primary.action}</span>
             {todo.primary.key !== "stale" && todo.reasons.filter(r => r.key === "stale").map(reason => <span key={reason.key} className="ml-2 inline-block rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{reason.action}</span>)}

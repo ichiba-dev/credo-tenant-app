@@ -11,7 +11,7 @@ const filters: {key: RepairFilter; label: string}[] = [
   {key:"estimate",label:"見積待ち"}, {key:"completed",label:"完了"}, {key:"all",label:"すべて"},
 ];
 const dateFormat = new Intl.DateTimeFormat("ja-JP", {timeZone:"Asia/Tokyo",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"});
-export default function RepairList({repairs, renderDetail}: {repairs: AdminRepair[]; renderDetail: (repair: AdminRepair) => ReactNode}) {
+export default function RepairList({repairs, renderDetail, calendarOverview, listHeader}: {repairs: AdminRepair[]; calendarOverview?: ReactNode; listHeader?: ReactNode; renderDetail: (repair: AdminRepair) => ReactNode}) {
   const [filter,setFilter] = useState<RepairFilter>("active");
   const [search,setSearch] = useState("");
   const [visited,setVisited] = useState<Set<number>>(() => new Set());
@@ -36,12 +36,19 @@ export default function RepairList({repairs, renderDetail}: {repairs: AdminRepai
   const visible = (repair: AdminRepair) => matchesRepairFilter(repairListState(repair),filter) && matchesRepairSearch(repair,search);
   const visibleCount = repairs.filter(visible).length;
   const countLabel = filter === "active" ? "未完了" : filter === "all" ? "表示" : filters.find(item => item.key === filter)?.label;
-  return <section className="mt-5" aria-label="修理案件一覧">
+  return <div className="grid min-w-0 grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]">
+    <aside aria-label="今日やること・予定" tabIndex={0}
+      className="min-w-0 xl:sticky xl:top-6 xl:col-start-2 xl:row-start-1 xl:max-h-[calc(100dvh-3rem)] xl:overflow-y-auto xl:overscroll-contain xl:pr-1">
     <RepairTodos repairs={repairs} onSelect={id => {
       setFilter("all"); setSearch("");
       setVisited(previous => new Set(previous).add(id));
       setJumpId(id);
     }} />
+    {calendarOverview}
+    <a href="/admin/calendar" className="inline-flex min-h-11 items-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-[#0b2e59] underline">カレンダーを開く</a>
+    </aside>
+    <section className="min-w-0 xl:col-start-1 xl:row-start-1" aria-label="修理案件一覧">
+    {listHeader}
     <h2 className="mb-3 font-bold text-[#0b2e59]">修理依頼一覧</h2>
     <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
       {filters.map(item => <button key={item.key} type="button" aria-pressed={filter===item.key}
@@ -88,5 +95,6 @@ export default function RepairList({repairs, renderDetail}: {repairs: AdminRepai
         </div>;
       })}
     </div>
-  </section>;
+  </section>
+  </div>;
 }

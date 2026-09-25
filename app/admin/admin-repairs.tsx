@@ -33,7 +33,7 @@ function getDisplayPhotos(repair: {
       : [];
 }
 
-export default function AdminRepairs({ repairs, canUpdate, children, replyScope }: { repairs: AdminRepair[]; canUpdate: boolean; children?: ReactNode; replyScope?: string }) {
+export default function AdminRepairs({ repairs, canUpdate, children, calendarOverview, replyScope }: { repairs: AdminRepair[]; canUpdate: boolean; children?: ReactNode; calendarOverview?: ReactNode; replyScope?: string }) {
   const router = useRouter();
   const [comments, setComments] = useState<{ [key: number]: string }>({});
   const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null);
@@ -84,11 +84,12 @@ export default function AdminRepairs({ repairs, canUpdate, children, replyScope 
   }
   return (
     <main className="min-h-screen bg-gray-100 p-3 sm:p-6">
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto max-w-[1600px]">
         <nav className="mb-5 flex flex-wrap justify-end gap-2">
           <Link href="/admin/calendar" className="rounded-lg bg-blue-950 px-4 py-2 font-bold text-white shadow hover:bg-blue-900">カレンダー</Link>
           <Link href="/admin/vendors" className="rounded-lg bg-blue-950 px-4 py-2 font-bold text-white shadow hover:bg-blue-900">業者マスタ</Link>
         </nav>
+        <RepairList repairs={repairs} calendarOverview={calendarOverview} listHeader={<>
         {children}
 
         <h1 className="text-3xl font-bold">
@@ -101,7 +102,7 @@ export default function AdminRepairs({ repairs, canUpdate, children, replyScope 
 
         <p role="status" className="mt-3 text-sm">{isSaving ? "保存中…" : message}</p>
         {!canUpdate && <p className="mt-3 text-sm">閲覧専用です。ステータス・コメントは更新できません。</p>}
-        <RepairList repairs={repairs} renderDetail={(repair) => (
+        </>} renderDetail={(repair) => (
            <div>
              <p className="font-bold">
                {repair.property_name} {repair.room_number}号室

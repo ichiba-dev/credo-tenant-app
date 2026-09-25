@@ -23,6 +23,7 @@ const {repairListState:state,matchesRepairFilter:filter,matchesRepairSearch:sear
 const base={id:1,property_name:'イリステージ',room_number:'302',tenant_name:'田中',category:'エアコン',description:'冷えない',
  status:'受付',created_at:'2026-09-01T00:00:00Z',vendor_dispatches:[],tenant_messages:[],owner_report_estimates:null};
 const dispatch=(status)=>({status,selectedAt:'2026-09-02T00:00:00Z',events:[],messages:[]});
+const nodes=node=>!node||typeof node!=='object'?[]:Array.isArray(node)?node.flatMap(nodes):[node,...nodes(node.props?.children)];
 test('unassigned and candidates explain attention; completed wins over stale dispatches',()=>{
  assert.equal(state(base).attention,true);assert.ok(state(base).reasons.includes('業者未手配'));
  assert.ok(state({...base,vendor_dispatches:[dispatch('candidate')]}).reasons.includes('手配候補'));
@@ -66,7 +67,7 @@ test('todo jump opens property and repair, focuses and scrolls the existing deta
   const i=index++;return [typeof initial==='function'?initial():initial,value=>{values[i]=typeof value==='function'?value(new Set()):value;}];
  }},'react/jsx-runtime':jsx,'./repair-list-state':helper}).default;
  const tree=MockList({repairs:[base],renderDetail:()=>null});
- tree.props.children[0].props.onSelect(1);
+ nodes(tree).find(node=>node.props?.onSelect).props.onSelect(1);
  assert.equal(values[0],'all');assert.equal(values[1],'');assert.ok(values[2].has(1));assert.equal(values[3],1);
 });
 test('todo empty states and condition filter retain one row per repair',()=>{
@@ -137,6 +138,70 @@ test('search supports all requested fields, full-width digits and multiple terms
  assert.equal(search(base,'405'),false);assert.equal(filter(state(base),'all'),true);
 });
 const List=load('./repair-list.tsx',{'react':React,'react/jsx-runtime':jsx,'./repair-list-state':helper}).default;
+
+test('desktop sidebar shares one todo instance; mobile keeps todo, calendar, then repairs',()=>{
+ const MockList=load('./repair-list.tsx',{'react':{...React,useEffect:()=>{},useMemo:fn=>fn(),useState:initial=>[typeof initial==='function'?initial():initial,()=>{}]},'react/jsx-runtime':jsx,'./repair-list-state':helper}).default;
+ const overview=React.createElement('div',null,'TODAY_AND_TOMORROW');
+ const tree=MockList({repairs:[base],calendarOverview:overview,listHeader:React.createElement('h1',null,'REPAIR_HEADER'),renderDetail:()=>null});
+ assert.match(tree.props.className,/grid-cols-1/);
+ assert.ok(tree.props.className.includes('xl:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]'));
+ const [sidebar,primary]=tree.props.children;
+ assert.equal(sidebar.type,'aside');assert.equal(sidebar.props.tabIndex,0);
+ for(const rule of ['xl:sticky','xl:top-6','xl:col-start-2','xl:max-h-[calc(100dvh-3rem)]','xl:overflow-y-auto'])assert.ok(sidebar.props.className.includes(rule));
+ assert.equal(primary.type,'section');assert.match(primary.props.className,/xl:col-start-1/);
+ assert.equal(nodes(tree).filter(node=>node.props?.onSelect).length,1);
+ assert.equal(sidebar.props.children[1],overview);
+ const html=renderToStaticMarkup(tree);
+ assert.ok(html.indexOf('今日やること')<html.indexOf('TODAY_AND_TOMORROW'));
+ assert.ok(html.indexOf('TODAY_AND_TOMORROW')<html.indexOf('REPAIR_HEADER'));
+ assert.match(html,/href="\/admin\/calendar"/);
+});
+
+test('sidebar reuses calendar today/tomorrow, empty state, repair links and viewer permissions',()=>{
+ const calendar=load('./calendar-state.ts');
+ const imports={'react':React,'react/jsx-runtime':jsx,'next/navigation':{useRouter:()=>({refresh(){}})},'./calendar-state':calendar};
+ const Events=load('./calendar-events-list.tsx',{...imports,'./calendar-actions':{},'./calendar-event-form':{default:()=>null}}).default;
+ const Overview=load('./calendar-overview.tsx',{...imports,'./calendar-events-list':{default:Events}}).default;
+ const today={id:'today',title:'今日の現調',starts_at:'2026-09-25T01:00:00Z',ends_at:null,all_day:false,status:'scheduled',repair_request_id:1};
+ const events=[today,{...today,id:'tomorrow',title:'明日の工事',starts_at:'2026-09-26T01:00:00Z'}];
+ const render=(rows,canUpdate)=>renderToStaticMarkup(React.createElement(List,{repairs:[base],renderDetail:()=>null,
+  calendarOverview:React.createElement(Overview,{events:rows,canUpdate,initialNow:Date.parse('2026-09-25T00:00:00Z')})})).split('</aside>')[0];
+ const viewer=render(events,false);
+ assert.match(viewer,/今日の予定 1件/);assert.match(viewer,/明日の予定 1件/);
+ assert.match(viewer,/href="\/admin#repair-detail-1"/);
+ assert.doesNotMatch(viewer,/>完了<|>キャンセル</);
+ assert.match(render(events,true),/>完了</);assert.match(render(events,true),/>キャンセル</);
+ for(const rows of [[],events.map(event=>({...event,status:'completed'})),events.map(event=>({...event,status:'cancelled'}))]) {
+  const html=render(rows,false);assert.doesNotMatch(html,/今日の予定|明日の予定/);assert.match(html,/カレンダーを開く/);
+ }
+});
+
+test('repair row still mounts the existing detail only after opening',()=>{
+ let index=0;const values=['active','',new Set(),null];
+ const MockList=load('./repair-list.tsx',{'react':{...React,useEffect:()=>{},useMemo:fn=>fn(),useState:()=>{
+  const slot=index++;return [values[slot],value=>{values[slot]=typeof value==='function'?value(values[slot]):value;}];
+ }},'react/jsx-runtime':jsx,'./repair-list-state':helper}).default;
+ let calls=0;const render=()=>{index=0;return MockList({repairs:[base],renderDetail:()=>{calls++;return React.createElement('p',null,'EXISTING_DETAIL');}});};
+ let tree=render();assert.equal(calls,0);
+ nodes(tree).find(node=>node.props?.id==='repair-detail-1').props.onToggle({currentTarget:{open:true}});
+ tree=render();assert.equal(calls,1);assert.match(renderToStaticMarkup(tree),/EXISTING_DETAIL/);
+});
+
+test('admin composition widens the container and preserves viewer restrictions and detail components',()=>{
+ const Stub=()=>null;
+ const Admin=load('./admin-repairs.tsx',{'react':React,'react/jsx-runtime':jsx,'next/navigation':{useRouter:()=>({refresh(){}})},
+  './actions':{},'./photo-actions':{},'./repair-pdf-button':{default:Stub},'@/app/components/repair-image':{default:Stub},
+  './estimate-section':{default:Stub},'./message-section':{MessageSection:Stub},'./vendor-quote-upload-form':{VendorQuoteUploadForm:Stub},
+  './vendor-dispatch-section':{VendorDispatchSection:Stub},'./repair-calendar-section':{default:Stub},'./repair-list':{default:List},
+  'next/link':{default:({children,...props})=>React.createElement('a',props,children)}}).default;
+ const html=renderToStaticMarkup(React.createElement(Admin,{repairs:[base],canUpdate:false,calendarOverview:React.createElement('p',null,'CALENDAR_SLOT')},'LINE_NOTICE'));
+ assert.match(html,/max-w-\[1600px\]/);assert.match(html,/閲覧専用です/);
+ assert.ok(html.indexOf('CALENDAR_SLOT')<html.indexOf('</aside>'));
+ assert.ok(html.indexOf('LINE_NOTICE')>html.indexOf('</aside>'));
+ const page=readFileSync(new URL('./page.tsx',import.meta.url),'utf8');
+ assert.match(page,/calendarOverview=\{/);assert.equal((page.match(/<CalendarOverview /g)||[]).length,1);
+ assert.match(page,/<CalendarOverview events=\{calendarEvents\} initialNow=\{now\} canUpdate=\{context.canUpdate\}/);
+});
 test('initial UI renders grouped summaries and compact rows without mounting existing details',()=>{
  let calls=0;
  const html=renderToStaticMarkup(React.createElement(List,{repairs:[base,{...base,id:2,status:'完了'}],renderDetail:()=>{calls++;return React.createElement('div',null,'DETAIL');}}));
