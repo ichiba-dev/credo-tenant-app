@@ -1,55 +1,81 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { eventsOnDay, eventTime, japanDay, type CalendarEvent } from "../calendar-state";
+import { eventsOnDay, japanDay, type CalendarEvent } from "../calendar-state";
 import { monthDays, shiftMonth } from "./month-grid";
+import { moveDate, TYPE_LABELS, typeLabel, weekDays, type CalendarMode } from "./scheduler";
 import CalendarEventsList from "../calendar-events-list";
+import CalendarMonth from "./calendar-month";
+import CalendarTimeline from "./calendar-timeline";
 
-export default function CalendarView({events,month,initialDay,initialNow,canUpdate}: {events:CalendarEvent[];month:string;initialDay:string;initialNow:number;canUpdate:boolean}) {
-  const [day,setDay]=useState(initialDay),[now,setNow]=useState(initialNow);
-  useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),60000);return()=>clearInterval(timer);},[]);
-  const today=japanDay(now), selected=eventsOnDay(events,day);
-  const control="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-[#0b2e59]";
-  return <>
-    <header className="mb-4 flex flex-col gap-3 text-[#0b2e59] sm:flex-row sm:items-center sm:justify-between">
-      <h2 className="text-xl font-bold">{Number(month.slice(0,4))}年{Number(month.slice(5))}月 <span className="text-xs font-normal text-slate-500">日本時間</span></h2>
-      <nav aria-label="表示月" className="flex items-center gap-2">
-        <Link className={control} href={`?month=${shiftMonth(month,-1)}`} aria-label="前月">＜<span className="sr-only sm:not-sr-only"> 前月</span></Link>
-        {today.startsWith(month)?<button type="button" className={control} onClick={()=>setDay(today)}>今日</button>:
-          <Link className={control} href={`?month=${today.slice(0,7)}`}>今日</Link>}
-        <Link className={control} href={`?month=${shiftMonth(month,1)}`} aria-label="次月"><span className="sr-only sm:not-sr-only">次月 </span>＞</Link>
+const control = "rounded-md border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-[#0b2e59]";
+const shortDate = (day: string) => `${Number(day.slice(5,7))}/${Number(day.slice(-2))}`;
+
+export default function CalendarView({events,month,initialDay,initialNow,canUpdate,mode='auto'}: {
+  events:CalendarEvent[];month:string;initialDay:string;initialNow:number;canUpdate:boolean;mode?:CalendarMode;
+}) {
+  const router = useRouter();
+  const day = initialDay;
+  const [now,setNow] = useState(initialNow);
+  // A filter group can be extended without introducing fictitious assignee/store data.
+  const [filters,setFilters] = useState<{hiddenTypes:string[]}>({hiddenTypes:[]});
+  useEffect(() => {const timer=setInterval(() => setNow(Date.now()),60000);return () => clearInterval(timer);},[]);
+  const today=japanDay(now), week=weekDays(day);
+  const visible=events.filter(e => !filters.hiddenTypes.includes(e.event_type));
+  const selected=eventsOnDay(visible,day);
+  const types=Array.from(new Set([...Object.keys(TYPE_LABELS), ...events.map(e => e.event_type)]));
+  const desktopMode=mode==='auto'?'week':mode;
+  const mobileMode=mode==='day'?'day':'month';
+  const href=(date:string,view:CalendarMode=mode) => `?month=${date.slice(0,7)}&day=${date}&view=${view}`;
+  const selectDay=(date:string) => router.push(href(date), {scroll:false});
+  const toolbar=(view:'month'|'week'|'day',mobile:boolean) => <div className={mobile?'md:hidden':'hidden md:flex md:flex-1'}>
+    <div className="flex w-full flex-wrap items-center justify-between gap-3">
+      <nav aria-label={mobile?'スマホ表示期間':'表示期間'} className="flex flex-wrap items-center gap-2">
+        <Link scroll={false} className={control} href={href(today)}>今日</Link>
+        <Link scroll={false} className={control} href={href(moveDate(day,view,-1))} aria-label={`前${view==='month'?'月':view==='week'?'週':'日'}`}>‹ <span className="sr-only sm:not-sr-only">前{view==='month'?'月':view==='week'?'週':'日'}</span></Link>
+        <Link scroll={false} className={control} href={href(moveDate(day,view,1))} aria-label={`次${view==='month'?'月':view==='week'?'週':'日'}`}><span className="sr-only sm:not-sr-only">次{view==='month'?'月':view==='week'?'週':'日'}</span> ›</Link>
+        <h2 aria-live="polite" className="text-base font-bold">{view==='month'?`${Number(month.slice(0,4))}年${Number(month.slice(5))}月`:view==='week'?`${day.slice(0,4)}年 ${shortDate(week[0])} - ${shortDate(week[6])}`:`${day.slice(0,4)}年 ${shortDate(day)}`}</h2>
       </nav>
-    </header>
-    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white" aria-label={`${month}のカレンダー`}>
-      <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
-        {['日','月','火','水','木','金','土'].map(d=><span key={d} className="py-2 text-center text-xs font-medium text-slate-600">{d}</span>)}
-      </div>
-      <div className="grid grid-cols-7">
-        {monthDays(month).map(d=>{
-          const items=eventsOnDay(events,d),current=d.startsWith(month),active=day===d;
-          return <div key={d} className={`relative min-w-0 border-b border-r border-slate-200 last:border-r-0 ${active?'bg-blue-50 ring-2 ring-inset ring-[#0b2e59]':current?'bg-white':'bg-slate-50'}`}>
-            <button type="button" aria-pressed={active} aria-current={d===today?'date':undefined} aria-controls="selected-day-events"
-              aria-label={`${d} 予定${items.length}件`} onClick={()=>setDay(d)}
-              className="flex min-h-16 w-full flex-col items-center gap-1 p-1 focus-visible:outline-2 focus-visible:outline-[#0b2e59] md:min-h-0 md:items-start md:p-2">
-              <span className={`flex h-7 w-7 items-center justify-center rounded-full text-sm ${d===today?'bg-[#0b2e59] font-bold text-white':current?'text-slate-800':'text-slate-400'}`}>{Number(d.slice(-2))}</span>
-              <span aria-hidden="true" className="flex h-2 gap-0.5 md:hidden">{items.slice(0,3).map(e=><span key={e.id} className={`h-1.5 w-1.5 rounded-full ${e.status==='scheduled'?'bg-[#0b2e59]':'bg-slate-300'}`}/>)}</span>
-            </button>
-            <div className="hidden min-h-24 space-y-1 px-1 pb-2 md:block">
-              {items.slice(0,3).map(e=>{
-                const label=`${eventTime(e)} ${e.title}${e.status==='completed'?'（完了）':e.status==='cancelled'?'（キャンセル）':''}`;
-                const style=`block truncate rounded px-1 py-0.5 text-xs ${e.status==='scheduled'?'bg-slate-100 text-[#0b2e59] hover:bg-blue-100':'text-slate-400'} ${current?'':'opacity-60'}`;
-                return e.repair_request_id?<a key={e.id} href={`/admin#repair-detail-${e.repair_request_id}`} className={style} title={label}>{label}</a>:
-                  <button key={e.id} type="button" onClick={()=>setDay(d)} className={`${style} w-full text-left`} title={label}>{label}</button>;
-              })}
-              {items.length>3&&<button type="button" onClick={()=>setDay(d)} className="px-1 text-xs text-slate-600 underline" aria-label={`${d}の予定をすべて表示`}>他{items.length-3}件</button>}
-            </div>
-          </div>;
-        })}
+      <nav aria-label={mobile?'スマホ表示切替':'表示切替'} className="flex rounded-md border border-slate-200 bg-white p-0.5">
+        {(mobile?['month','day'] as const:['month','week','day'] as const).map(v => <Link key={v} scroll={false} href={href(day,v)} aria-current={view===v?'page':undefined}
+          className={`rounded px-4 py-1.5 text-sm focus-visible:outline-2 ${view===v?'bg-[#0b2e59] text-white':'hover:bg-slate-100'}`}>{v==='month'?'月':v==='week'?'週':'日'}</Link>)}
+      </nav>
+    </div>
+  </div>;
+  return <>
+    <header className="mb-4 text-[#0b2e59]">{toolbar(desktopMode,false)}{toolbar(mobileMode,true)}<p className="mt-2 text-xs text-slate-500">日本時間 · 案件に紐付いた予定をクリックすると詳細を開きます</p></header>
+    <div className="flex items-start gap-4">
+      <aside aria-label="カレンダーとフィルター" className="hidden w-52 shrink-0 space-y-6 rounded-lg border border-slate-200 bg-white p-3 md:block">
+        <section aria-label="ミニ月間カレンダー">
+          <div className="mb-2 flex items-center justify-between text-sm font-semibold text-[#0b2e59]">
+            <Link scroll={false} className="rounded p-2 hover:bg-slate-100" aria-label="ミニカレンダー前月" href={href(shiftMonth(month,-1)+'-01')}>‹</Link>
+            <span>{Number(month.slice(0,4))}年{Number(month.slice(5))}月</span>
+            <Link scroll={false} className="rounded p-2 hover:bg-slate-100" aria-label="ミニカレンダー次月" href={href(shiftMonth(month,1)+'-01')}>›</Link>
+          </div>
+          <div className="grid grid-cols-7 text-center text-xs">
+            {['日','月','火','水','木','金','土'].map(d => <span key={d} className="py-1 text-slate-500">{d}</span>)}
+            {monthDays(month).map(d => <button key={d} type="button" onClick={() => selectDay(d)} aria-label={`ミニカレンダー ${d}`} aria-pressed={d===day} aria-current={d===today?'date':undefined}
+              className={`rounded py-1.5 focus-visible:outline-2 ${d===day?'bg-[#0b2e59] text-white':d===today?'bg-blue-100 font-bold text-[#0b2e59]':!d.startsWith(month)?'text-slate-400':week.includes(d)&&desktopMode==='week'?'bg-slate-100':'hover:bg-slate-100'}`}>{Number(d.slice(-2))}</button>)}
+          </div>
+        </section>
+        <fieldset className="space-y-2"><legend className="mb-3 text-sm font-bold text-[#0b2e59]">予定種類</legend>
+          {types.map(type => <label key={type} className="flex cursor-pointer items-center gap-2 text-sm text-slate-700"><input type="checkbox" className="h-4 w-4 accent-[#0b2e59]" checked={!filters.hiddenTypes.includes(type)}
+            onChange={e => setFilters({hiddenTypes:e.target.checked?filters.hiddenTypes.filter(t => t!==type):[...filters.hiddenTypes,type]})}/>{typeLabel(type)}</label>)}
+        </fieldset>
+      </aside>
+      <div className="min-w-0 flex-1">
+        {filters.hiddenTypes.length>0&&<p role="status" className="mb-2 flex items-center gap-3 text-xs text-slate-600">予定種類で絞り込み中<button type="button" className="underline" onClick={() => setFilters({hiddenTypes:[]})}>すべて表示</button></p>}
+        <div className={desktopMode==='month'?'':'md:hidden'}>
+          {mobileMode==='month' || desktopMode==='month' ? <CalendarMonth events={visible} month={month} day={day} today={today} onSelect={selectDay}/> : null}
+        </div>
+        {desktopMode==='week'&&<div className="hidden md:block"><CalendarTimeline events={visible} days={week} day={day} now={now} onSelect={selectDay}/></div>}
+        {desktopMode==='day'&&<CalendarTimeline events={visible} days={[day]} day={day} now={now} onSelect={selectDay}/>}
+        <section id="selected-day-events" className="mt-4 min-w-0 rounded-lg border border-slate-200 bg-white p-4" aria-labelledby="selected-day-title">
+          <h2 id="selected-day-title" aria-live="polite" className="font-bold text-[#0b2e59]">{Number(day.slice(5,7))}月{Number(day.slice(-2))}日の予定 <span className="text-sm font-normal">{selected.length}件</span></h2>
+          {selected.length?<CalendarEventsList events={selected} now={now} canUpdate={canUpdate}/>:<p className="mt-2 text-sm text-slate-500">予定はありません。</p>}
+        </section>
       </div>
     </div>
-    <section id="selected-day-events" className="mt-4 min-w-0 rounded-lg border border-slate-200 bg-white p-4" aria-labelledby="selected-day-title">
-      <h2 id="selected-day-title" aria-live="polite" className="font-bold text-[#0b2e59]">{Number(day.slice(5,7))}月{Number(day.slice(-2))}日の予定 <span className="text-sm font-normal">{selected.length}件</span></h2>
-      {selected.length?<CalendarEventsList events={selected} now={now} canUpdate={canUpdate}/>:<p className="mt-2 text-sm text-slate-500">予定はありません。</p>}
-    </section>
   </>;
 }

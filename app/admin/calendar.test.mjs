@@ -13,7 +13,11 @@ function load(file,imports={}) {
 }
 const state=load('./calendar-state.ts');
 const grid=load('./calendar/month-grid.ts',{'../calendar-state':state});
-const Link=({children,...props})=>React.createElement('a',props,children);
+const Link=({children,scroll,...props})=>React.createElement('a',props,children);
+const scheduler=load('./calendar/scheduler.ts',{'../calendar-state':state,'./month-grid':grid});
+const Month=load('./calendar/calendar-month.tsx',{'react/jsx-runtime':jsx,'../calendar-state':state,'./month-grid':grid}).default;
+const Timeline=load('./calendar/calendar-timeline.tsx',{'react/jsx-runtime':jsx,'../calendar-state':state,'./scheduler':scheduler}).default;
+const viewImports={'./scheduler':scheduler,'./calendar-month':{default:Month},'./calendar-timeline':{default:Timeline},'next/navigation':{useRouter:()=>({push(){}})}};
 const id='11111111-1111-4111-8111-111111111111',dispatch='33333333-3333-4333-8333-333333333333';
 const input={id,repairId:1,dispatchId:dispatch,eventType:'site_visit',date:'2026-09-26',start:'10:00',end:'11:00',allDay:false,notes:'現調',edit:false};
 const event={id,title:'物件 302号室 現調',event_type:'site_visit',starts_at:'2026-09-26T01:00:00Z',ends_at:null,
@@ -111,7 +115,7 @@ test('overview renders no empty cards and calendar month/day view includes event
  assert.doesNotMatch(renderToStaticMarkup(React.createElement(Overview,{events:[],initialNow:now,canUpdate:false})),/<section/);
  const html=renderToStaticMarkup(React.createElement(Overview,{events:[event],initialNow:now,canUpdate:false}));
  assert.match(html,/今日の予定 1件/);assert.doesNotMatch(html,/明日の予定/);
- const View=load('./calendar/calendar-view.tsx',{'react':React,'react/jsx-runtime':jsx,'../calendar-state':state,'./month-grid':grid,'next/link':{default:Link},'../calendar-events-list':{default:Lists}}).default;
+ const View=load('./calendar/calendar-view.tsx',{...viewImports,'react':React,'react/jsx-runtime':jsx,'../calendar-state':state,'./month-grid':grid,'next/link':{default:Link},'../calendar-events-list':{default:Lists}}).default;
  const month=renderToStaticMarkup(React.createElement(View,{events:[event],month:'2026-09',initialDay:'2026-09-26',initialNow:now,canUpdate:false}));
  assert.match(month,/2026-09-26 予定1件/);assert.match(month,/物件 302号室/);
 });
@@ -123,22 +127,83 @@ test('month grid has full Sunday weeks, adjacent dates, leap day and year naviga
  assert.ok(grid.monthDays('2028-02').includes('2028-02-29'));
  assert.equal(grid.shiftMonth('2026-12',1),'2027-01');assert.equal(grid.shiftMonth('2026-01',-1),'2025-12');
 });
-test('calendar selection, today reset, overflow, repair links and mobile indicators share events',()=>{
- let values=[],cursor=0;
+test('calendar modes, navigation, selection and filters preserve repair links and mobile month',()=>{
+ let values=[],cursor=0,navigated='';
  const hooks={...React,useEffect(){},useState(initial){const i=cursor++;if(!(i in values))values[i]=initial;return [values[i],v=>{values[i]=v;}];}};
- const View=load('./calendar/calendar-view.tsx',{'react':hooks,'react/jsx-runtime':jsx,'next/link':{default:Link},'./month-grid':grid,
-  '../calendar-state':state,'../calendar-events-list':{default:Lists}}).default;
+ const View=load('./calendar/calendar-view.tsx',{...viewImports,'react':hooks,'react/jsx-runtime':jsx,'next/link':{default:Link},'./month-grid':grid,
+  'next/navigation':{useRouter:()=>({push(url){navigated=url;}})},'../calendar-state':state,'../calendar-events-list':{default:Lists}}).default;
  const props={events:Array.from({length:6},(_,i)=>({...event,id:String(i),status:i===5?'cancelled':'scheduled'})),month:'2026-09',initialDay:'2026-09-26',initialNow:Date.parse('2026-09-26T00:00:00Z'),canUpdate:false};
  const render=()=>{cursor=0;return View(props);};
  const nodes=(n)=>!n||typeof n!=='object'?[]:Array.isArray(n)?n.flatMap(nodes):[n,...nodes(n.props?.children)];
  let tree=render(),html=renderToStaticMarkup(tree);
  assert.match(html,/aria-current="date"/);assert.match(html,/他3件/);assert.match(html,/href="\/admin#repair-detail-1"/);
  assert.match(html,/md:hidden/);assert.match(html,/md:block/);assert.match(html,/9月26日の予定/);assert.match(html,/キャンセル/);
- assert.match(html,/month=2026-08/);assert.match(html,/month=2026-10/);
- nodes(tree).find(n=>n.props?.['aria-label']==='2026-09-27 予定0件').props.onClick();
+ assert.match(html,/週タイムライン/);assert.match(html,/9\/21 - 9\/27/);assert.match(html,/day=2026-10-03/);
+ const calendar=nodes(tree).find(n=>n.type===Month);
+ calendar.props.onSelect('2026-09-27');assert.match(navigated,/day=2026-09-27/);
+ props.initialDay='2026-09-27';
  tree=render();html=renderToStaticMarkup(tree);assert.match(html,/9月27日の予定/);assert.match(html,/予定はありません/);
- nodes(tree).find(n=>n.type==='button'&&n.props.children==='今日').props.onClick();
- html=renderToStaticMarkup(render());assert.match(html,/9月26日の予定/);
- props.events=[];assert.match(renderToStaticMarkup(render()),/予定はありません/);
- props.month='2026-10';assert.match(renderToStaticMarkup(render()),/href="\?month=2026-09"/);
+ const today=nodes(tree).find(n=>n.type===Link&&n.props.children==='今日');assert.match(today.props.href,/day=2026-09-26/);
+ props.initialDay='2026-09-26';
+ tree=render();nodes(tree).find(n=>n.type==='input').props.onChange({target:{checked:false}});
+ html=renderToStaticMarkup(render());assert.doesNotMatch(html,/href="\/admin#repair-detail-1"/);assert.match(html,/絞り込み中/);
+ tree=render();nodes(tree).find(n=>n.type==='button'&&n.props.children==='すべて表示').props.onClick();
+ props.mode='month';html=renderToStaticMarkup(render());assert.doesNotMatch(html,/週タイムライン|日タイムライン/);assert.match(html,/他3件/);
+ props.mode='day';tree=render();html=renderToStaticMarkup(tree);assert.match(html,/日タイムライン/);assert.doesNotMatch(html,/週タイムライン/);
+ assert.equal(nodes(tree).find(n=>n.type===Timeline).props.days.length,1);
+ props.mode='week';assert.match(renderToStaticMarkup(render()),/週タイムライン/);
+});
+
+test('scheduler uses Monday weeks, clamped months, and ranges including month-crossing Sunday',()=>{
+ assert.deepEqual(Array.from(scheduler.weekDays('2026-09-27')),['2026-09-21','2026-09-22','2026-09-23','2026-09-24','2026-09-25','2026-09-26','2026-09-27']);
+ assert.equal(scheduler.moveDate('2026-12-28','week',1),'2027-01-04');
+ assert.equal(scheduler.moveDate('2026-01-31','month',1),'2026-02-28');
+ assert.equal(scheduler.moveDate('2028-01-31','month',1),'2028-02-29');
+ assert.equal(scheduler.moveDate('2026-12-31','day',1),'2027-01-01');
+ const range=scheduler.calendarRange('2026-09','2026-09-30');
+ assert.equal(range.from,'2026-08-30');assert.equal(range.until,'2026-10-05');
+});
+
+test('timeline duration, adjacent appointments, overlaps, missing ends and midnight splits',()=>{
+ const make=(id,start,end)=>({...event,id,starts_at:`2026-09-26T${start}:00+09:00`,ends_at:end?`2026-09-26T${end}:00+09:00`:null});
+ const events=[make('long','10:00','11:30'),make('overlap','10:30','11:00'),make('adjacent','11:30','12:00'),make('unknown','13:00',null)];
+ const slots=scheduler.layoutDay(events,'2026-09-26');
+ assert.equal(slots[0].end-slots[0].start,90);assert.equal(slots[0].lanes,2);assert.equal(slots[1].lane,1);
+ assert.equal(slots[2].lanes,1);assert.equal(slots[3].end-slots[3].start,30);assert.match(scheduler.timeLabel(events[3]),/終了未定/);
+ const spanning={...event,starts_at:'2026-09-25T23:00:00+09:00',ends_at:'2026-09-26T01:30:00+09:00'};
+ const split=scheduler.layoutDay([spanning],'2026-09-26')[0];assert.equal(split.start,0);assert.equal(split.end,90);
+ assert.equal(scheduler.layoutDay([{...spanning,ends_at:'2026-09-26T00:00:00+09:00'}],'2026-09-26').length,0);
+ const bounds=scheduler.timeBounds([spanning,make('late','22:00','23:30')],['2026-09-26']);assert.equal(bounds.start,0);assert.equal(bounds.end,1440);
+ assert.equal(scheduler.layoutDay([{...event,all_day:true}],'2026-09-26').length,0);
+});
+
+test('timeline renders proportional blocks, all-day events, now marker, status and accessible details',()=>{
+ const props={events:[{...event,ends_at:'2026-09-26T02:30:00Z'}, {...event,id:'all',all_day:true,title:'終日作業',status:'completed'},
+ {...event,id:'cancel',title:'取消作業',status:'cancelled'}],days:scheduler.weekDays('2026-09-26'),day:'2026-09-26',now:Date.parse('2026-09-26T01:30:00Z'),onSelect(){}};
+ const html=renderToStaticMarkup(React.createElement(Timeline,props));
+ assert.match(html,/height:108px/);assert.match(html,/10:00〜11:30/);assert.match(html,/現地確認/);
+ assert.match(html,/終日作業/);assert.match(html,/opacity-60/);assert.match(html,/現在時刻/);assert.match(html,/キャンセル/);assert.match(html,/aria-label="10:00/);
+ assert.match(html,/href="\/admin#repair-detail-1"/);
+ assert.doesNotMatch(renderToStaticMarkup(React.createElement(Timeline,{...props,days:['2026-09-27']})),/現在時刻|終日作業/);
+});
+
+test('calendar page loads the complete cross-month week, validates date and preserves view',async()=>{
+ const calls=[];
+ const View=()=>null;
+ const Page=load('./calendar/page.tsx',{'react/jsx-runtime':jsx,'next/link':{default:Link},
+  'next/navigation':{redirect(){throw Error('redirect');}},
+  '@/lib/supabase-auth/staff':{getStaffContext:async()=>({ok:true,canUpdate:false})},
+  '../calendar-data':{getCalendarEvents:async(context,from,until)=>{calls.push({from,until});return [event];}},
+  '../calendar-state':state,'./scheduler':scheduler,'./calendar-view':{default:View}}).default;
+ const nodes=(n)=>!n||typeof n!=='object'?[]:Array.isArray(n)?n.flatMap(nodes):[n,...nodes(n.props?.children)];
+ let tree=await Page({searchParams:Promise.resolve({month:'2026-09',day:'2026-09-30',view:'week'})});
+ assert.equal(calls[0].until,'2026-10-05T00:00:00+09:00');
+ let props=nodes(tree).find(n=>n.type===View).props;
+ assert.equal(props.initialDay,'2026-09-30');assert.equal(props.mode,'week');assert.equal(props.canUpdate,false);
+ tree=await Page({searchParams:Promise.resolve({month:'2028-02',day:'2028-02-30',view:'invalid'})});
+ props=nodes(tree).find(n=>n.type===View).props;
+ assert.equal(props.initialDay,'2028-02-01');assert.equal(props.mode,'auto');
+ tree=await Page({searchParams:Promise.resolve({month:'2026-09',day:'2026-10-01',view:'day'})});
+ props=nodes(tree).find(n=>n.type===View).props;
+ assert.equal(props.month,'2026-10');assert.equal(props.mode,'day');
 });
