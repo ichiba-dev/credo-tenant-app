@@ -59,6 +59,15 @@ export default function RepairList({repairs, renderDetail, calendarOverview, cal
   const visibleCount = repairs.filter(visible).length;
   const countLabel = filter === "active" ? "未完了" : filter === "all" ? "表示" : filters.find(item => item.key === filter)?.label;
   const selected=repairs.find(repair=>repair.id===selectedId);
+  const firstVisibleId=groups.flatMap(group=>group.repairs).find(visible)?.id;
+  useEffect(()=>{
+    if(!desktop||selectedId!==null||firstVisibleId===undefined||jumpId!==null)return;
+    const linked=/^#repair-detail-(\d+)$/.exec(window.location.hash);
+    if(linked&&repairs.some(repair=>repair.id===Number(linked[1])))return;
+    // Use the rendered list order; do not change filters, focus, scroll or server state.
+    setSelectedId(previous=>previous??firstVisibleId);
+    setVisited(previous=>new Set(previous).add(firstVisibleId));
+  },[desktop,selectedId,firstVisibleId,jumpId,repairs]);
   return <div data-workspace-layout data-calendar-expanded={calendarExpanded} className="grid min-w-0 grid-cols-1 items-start gap-4 xl:min-h-0 xl:flex-1 xl:items-stretch">
     <aside data-workspace-dashboard aria-label="今日やること・予定" tabIndex={0} onClickCapture={event=>{
       if(!desktop||event.button!==0||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
@@ -68,7 +77,7 @@ export default function RepairList({repairs, renderDetail, calendarOverview, cal
     }}
       className="min-w-0 xl:sticky xl:top-0 xl:col-start-3 xl:row-start-1 xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain xl:pr-1">
     <h2 className="hidden font-bold text-[#0b2e59] xl:block">今日のダッシュボード</h2>
-    <RepairTodos repairs={repairs} onSelect={selectRepair} />
+    <RepairTodos repairs={repairs} onSelect={selectRepair} collapsedLimit={desktop?3:5} />
     {calendarOverview}
     <div className="hidden xl:block">
       {calendarWeek}
@@ -86,7 +95,7 @@ export default function RepairList({repairs, renderDetail, calendarOverview, cal
         <span className="block text-xs">{item.label}</span><strong className="text-xl">{repairs.filter(r => matchesRepairFilter(repairListState(r),item.key)).length}</strong><span className="ml-1 text-xs">件</span>
       </button>)}
     </div>
-    <div className="mt-4 flex flex-wrap items-end gap-3">
+    <div data-repair-search className="mt-4 flex flex-wrap items-end gap-3">
       <label className="min-w-0 flex-1 text-sm font-medium text-[#0b2e59]">案件を絞り込む
         <input type="search" value={search} onChange={event => setSearch(event.target.value)}
           placeholder="物件名・号室・入居者・カテゴリ・ステータス"
@@ -96,7 +105,7 @@ export default function RepairList({repairs, renderDetail, calendarOverview, cal
         className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-[#0b2e59]">未完了・要対応順に戻す</button>
     </div>
     <p role="status" className="mt-3 text-sm text-slate-600">{filter==="active" ? "未完了を要対応順に表示" : `${filters.find(f=>f.key===filter)?.label}を表示`} · {visibleCount} / {repairs.length}件</p>
-    <p className="mt-1 text-xs text-slate-500">件数は全案件から集計（状態は重複あり）。最終更新は取得済みの受付・メッセージ・手配履歴・見積ファイルの最新日時です。見積待ちは明示されたステータスのみで判定します。</p>
+    <p data-list-description className="mt-1 text-xs text-slate-500"><span className="xl:hidden">件数は全案件から集計（状態は重複あり）。最終更新は取得済みの受付・メッセージ・手配履歴・見積ファイルの最新日時です。見積待ちは明示されたステータスのみで判定します。</span><span className="hidden xl:inline">全案件集計・状態の重複あり。更新は取得済み履歴、見積待ちは登録状態に基づきます。</span></p>
     {visibleCount===0 && <p className="mt-5 rounded-xl bg-white p-5 text-sm text-slate-600">該当する案件はありません。「すべて」や検索条件を確認してください。</p>}
     <div className="mt-4 space-y-4">
       {groups.map(group => {

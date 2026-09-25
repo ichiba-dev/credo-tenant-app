@@ -5,7 +5,7 @@ import type { AdminRepair } from "./types";
 import { repairTodos, TODO_RULES, type TodoKey } from "./repair-todo-state";
 
 const dateFormat = new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
-export default function RepairTodos({ repairs, onSelect }: { repairs: AdminRepair[]; onSelect: (id: number) => void }) {
+export default function RepairTodos({ repairs, onSelect, collapsedLimit=5 }: { repairs: AdminRepair[]; onSelect: (id: number) => void; collapsedLimit?:number }) {
   const [filter, setFilter] = useState<TodoKey | "all">("all");
   const [now, setNow] = useState(0);
   const [expanded, setExpanded] = useState(false);
@@ -16,7 +16,7 @@ export default function RepairTodos({ repairs, onSelect }: { repairs: AdminRepai
   }, []);
   const todos = repairTodos(repairs, now);
   const visible = todos.filter(todo => filter === "all" || todo.primary.key === filter);
-  const displayed = expanded ? visible : visible.slice(0, 5);
+  const displayed = expanded ? visible : visible.slice(0, collapsedLimit);
   return <section aria-labelledby="repair-todos-heading" className="mb-6 rounded-xl border border-slate-200 bg-white p-4 xl:mb-3 xl:p-3">
     <h2 id="repair-todos-heading" className="font-bold text-[#0b2e59]">今日やること <span className="ml-2">{todos.length}件</span></h2>
     <div className="mt-3 flex flex-wrap gap-2">
@@ -37,9 +37,9 @@ export default function RepairTodos({ repairs, onSelect }: { repairs: AdminRepai
           <span className="text-xs text-slate-500">最終更新（確認可能分）<br />{todo.updatedAt ? dateFormat.format(todo.updatedAt) : "日時不明"}</span>
         </button>
       </li>)}</ul>}
-    {visible.length > 5 && <button type="button" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}
+    {visible.length > collapsedLimit && <button type="button" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}
       className="mt-3 rounded-lg border border-slate-200 px-3 py-2 text-sm text-[#0b2e59]">
-      {expanded ? "最初の5件に戻す" : `残り${visible.length - 5}件を見る`}
+      {expanded ? `最初の${collapsedLimit}件に戻す` : `残り${visible.length - collapsedLimit}件を見る`}
     </button>}
   </section>;
 }

@@ -18,18 +18,23 @@
     grid-template-columns: 320px minmax(0, 1fr) 400px;
   }
   .workspace [data-workspace-list] { padding-right: 4px; }
-  .workspace [data-workspace-list] > h2 { font-size: 14px; margin-bottom: 16px; }
+  .workspace [data-workspace-list] > h2 { font-size: 14px; margin-bottom: 8px; }
+  .workspace [data-workspace-list] > [role="status"] { margin-top: 8px; font-size: 12px; }
+  .workspace [data-workspace-list] > [role="status"]:empty { margin: 0; }
+  .workspace [data-repair-search] { margin-top: 8px; gap: 8px; }
+  .workspace [data-repair-search] > button { padding: 4px 8px; font-size: 12px; }
+  .workspace [data-list-description] { font-size: 11px; line-height: 1.5; }
   .workspace [data-repair-summary] { display: flex; flex-wrap: wrap; gap: 4px; }
   .workspace [data-repair-summary] button {
-    border: 0; border-radius: 8px; padding: 8px; display: flex;
+    border: 0; border-radius: 8px; padding: 4px 6px; display: flex;
     align-items: baseline; gap: 4px; background: transparent;
   }
   .workspace [data-repair-summary] button[aria-pressed="true"] { background: #0b2e59; }
-  .workspace [data-repair-summary] strong { font-size: 16px; }
+  .workspace [data-repair-summary] strong { font-size: 14px; }
   .workspace [data-repair-summary] button > span:last-child { margin-left: 0; font-size: 10px; }
   .workspace [data-property-group] { border: 0; border-radius: 8px; background: transparent; }
   .workspace [data-property-group] > summary {
-    background: #e9edf3; color: #0b2e59; padding: 12px; font-size: 13px;
+    background: #edf0f5; color: #0b2e59; padding: 12px; font-size: 13px;
   }
   .workspace [data-property-group] > summary > span { display: block; margin: 4px 0 0; font-size: 11px; color: #64748b; }
   .workspace [data-repair-row] { border-radius: 8px; padding: 12px; }
@@ -61,7 +66,7 @@
     margin: 0; border-bottom: 1px solid #e2e8f0;
   }
   .workspace [data-workspace-dashboard] h2 { font-size: 14px; }
-  .workspace [data-workspace-dashboard] > h2 { margin-bottom: 0; font-size: 16px; }
+  .workspace [data-workspace-dashboard] > h2 { margin-bottom: 0; font-size: 14px; color: #64748b; }
   .workspace [aria-labelledby="repair-todos-heading"] > div { gap: 4px; }
   .workspace [aria-labelledby="repair-todos-heading"] > div button { padding: 6px 8px; border-color: transparent; }
   .workspace [aria-labelledby="repair-todos-heading"] > p { font-size: 11px; line-height: 1.6; }

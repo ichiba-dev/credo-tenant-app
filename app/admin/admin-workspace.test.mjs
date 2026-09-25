@@ -27,7 +27,7 @@ function harness(initial=[],runEffects=false) {
 function listHarness(desktop=true,globals={}) {
  const h=harness(['active','',new Set(),null,desktop,null,false],true);
  const Todo=()=>null;
- const List=load('./repair-list.tsx',{'react':h.hooks,'react/jsx-runtime':jsx,'./repair-list-state':helper,'./repair-todo-state':todo,'./repair-todos':{default:Todo}},globals).default;
+ const List=load('./repair-list.tsx',{'react':h.hooks,'react/jsx-runtime':jsx,'./repair-list-state':helper,'./repair-todo-state':todo,'./repair-todos':{default:Todo}},{window:{location:{hash:''}},...globals}).default;
  const calls=[];
  const render=(repairs=[repair,{...repair,id:2,room_number:'301'}])=>{h.reset();calls.length=0;return List({repairs,renderDetail:(r,pc,active)=>{
   calls.push({id:r.id,pc,active});return React.createElement('p',null,`DETAIL_${r.id}`);
@@ -67,6 +67,44 @@ test('desktop presentation fixes side widths, keeps the center fluid and scopes 
  assert.match(source,/<header data-admin-header className="contents">/);
  assert.match(source,/hidden items-center gap-4.*xl:flex/);
  assert.match(source,/修理管理/);
+});
+
+test('desktop initializes from the visible existing order without changing filters or overriding explicit selection',()=>{
+ const rows=[{...repair,id:3,status:'完了'},{...repair,id:2,created_at:'2026-09-26T00:00:00Z'},repair];
+ const h=listHarness();h.render(rows);h.effects.at(-1)();
+ const expected=helper.groupRepairs(rows).flatMap(group=>group.repairs).find(r=>helper.matchesRepairFilter(helper.repairListState(r),'active'));
+ assert.equal(h.state[5],expected.id);assert.equal(h.state[0],'active');assert.equal(h.state[1],'');assert.equal(h.state[3],null);
+ let tree=h.render(rows);assert.ok(h.calls.some(call=>call.id===expected.id&&call.active));
+ nodes(tree).find(n=>n.props?.id==='repair-detail-1').props.children[0].props.onClick({preventDefault(){}});
+ h.render(rows);h.effects.at(-1)();assert.equal(h.state[5],1);
+ const filtered=listHarness();filtered.state[0]='all';filtered.state[1]='202';
+ filtered.render([{...repair,id:2,room_number:'301'},repair]);filtered.effects.at(-1)();assert.equal(filtered.state[5],1);
+ for(const candidates of [[],[{...repair,status:'完了'}]]) {
+  const empty=listHarness();empty.render(candidates);empty.effects.at(-1)();assert.equal(empty.state[5],null);assert.equal(empty.state[2].size,0);
+ }
+ const mobile=listHarness(false);mobile.render(rows);mobile.effects.at(-1)();assert.equal(mobile.state[5],null);
+ const linked=listHarness(true,{window:{location:{hash:'#repair-detail-1'}}});linked.render(rows);linked.effects.at(-1)();assert.equal(linked.state[5],null);
+ const pending=listHarness();pending.state[3]=1;pending.render(rows);pending.effects.at(-1)();assert.equal(pending.state[5],null);
+});
+
+test('desktop todo initially shows three, expands remaining sixteen, filters and jumps; mobile keeps five',()=>{
+ const h=harness(['all',Date.parse('2026-09-26T00:00:00Z'),false]);let selected;
+ const Todo=load('./repair-todos.tsx',{'react':h.hooks,'react/jsx-runtime':jsx,'./repair-todo-state':todo}).default;
+ const repairs=Array.from({length:19},(_,index)=>({...repair,id:index+1}));
+ const render=(collapsedLimit=3,rows=repairs)=>{h.reset();return Todo({repairs:rows,onSelect:id=>{selected=id;},collapsedLimit});};
+ let tree=render();assert.equal(nodes(tree).filter(n=>n.type==='li').length,3);
+ nodes(tree).find(n=>n.props?.children==='残り16件を見る').props.onClick();
+ tree=render();assert.equal(nodes(tree).filter(n=>n.type==='li').length,19);
+ nodes(tree).find(n=>n.props?.children==='最初の3件に戻す').props.onClick();
+ tree=render();nodes(tree).find(n=>n.props?.className?.includes('grid w-full')).props.onClick();assert.equal(selected,1);
+ const filters=nodes(tree).filter(n=>n.props?.['aria-pressed']!==undefined);filters[1].props.onClick();
+ tree=render();assert.equal(nodes(tree).filter(n=>n.type==='li').length,3);
+ assert.equal(nodes(render(5)).filter(n=>n.type==='li').length,5);
+ for(const count of [0,3])assert.ok(!nodes(render(3,repairs.slice(0,count))).some(n=>n.props?.['aria-expanded']!==undefined));
+ assert.ok(nodes(render(3,repairs.slice(0,4))).some(n=>n.props?.children==='残り1件を見る'));
+ for(const desktop of [true,false]) {
+  const list=listHarness(desktop);assert.equal(nodes(list.render()).find(n=>n.type===list.Todo).props.collapsedLimit,desktop?3:5);
+ }
 });
 
 test('three scrollable panes and calendar expansion keep selected case and narrow-screen layout',()=>{
