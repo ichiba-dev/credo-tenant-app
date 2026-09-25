@@ -334,3 +334,21 @@ for(const mode of ['month','week','day'])test(`selected-day count/list and ${mod
  props.events=[{...props.events[0],ends_at:'2026-09-26T04:00:00Z',notes:'最新メモ'}];
  const changed=render();assert.notEqual(changed.section.key,tomorrow.section.key);assert.match(changed.html,/最新メモ/);
 });
+
+test('calendar return link uses native /admin navigation in every mode and on load failure',async()=>{
+ const View=()=>null;
+ for(const view of [undefined,'month','week','day'])for(const unavailable of [false,true]) {
+  const Page=load('./calendar/page.tsx',{'react/jsx-runtime':jsx,'next/navigation':{redirect(){throw Error('redirect');}},
+   '@/lib/supabase-auth/staff':{getStaffContext:async()=>({ok:true,canUpdate:true})},
+   '../calendar-data':{getCalendarEvents:async()=>{if(unavailable)throw Error('unavailable');return [event];}},
+   '../calendar-state':state,'./scheduler':scheduler,'./calendar-view':{default:View}}).default;
+  const tree=await Page({searchParams:Promise.resolve({month:'2026-09',day:'2026-09-25',view})});
+  const back=nodesOf(tree).find(n=>n.props?.children==='修理依頼一覧へ');
+  assert.equal(back.type,'a');assert.equal(back.props.href,'/admin');
+  assert.equal(back.props.onClick,undefined);assert.equal(back.props.target,undefined);
+  assert.doesNotMatch(back.props.className,/hidden|pointer-events-none/);
+  assert.match(back.props.className,/min-h-11/);
+  assert.match(renderToStaticMarkup(tree),/href="\/admin"/);
+  if(!unavailable)assert.ok(nodesOf(tree).some(n=>n.type===View));
+ }
+});

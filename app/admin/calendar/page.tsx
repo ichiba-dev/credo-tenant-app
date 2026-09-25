@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getStaffContext } from "@/lib/supabase-auth/staff";
 import { getCalendarEvents } from "../calendar-data";
@@ -15,7 +14,8 @@ export default async function CalendarPage({searchParams}: {searchParams:Promise
   const range=calendarRange(month,day);
   let events;try {events=await getCalendarEvents(context,`${range.from}T00:00:00+09:00`,`${range.until}T00:00:00+09:00`);}catch{events=null;}
   return <main className="min-h-screen bg-slate-100 p-3 sm:p-6"><div className="w-full">
-    <Link href="/admin" className="text-sm text-[#0b2e59] underline">修理依頼一覧へ</Link>
+    {/* Use document navigation for leaving the scheduler, like its repair-detail links. */}
+    <a href="/admin" className="inline-flex min-h-11 items-center rounded px-2 text-sm text-[#0b2e59] underline focus-visible:outline-2 focus-visible:outline-[#0b2e59]">修理依頼一覧へ</a>
     <h1 className="my-4 text-2xl font-bold text-[#0b2e59]">カレンダー</h1>
     {events?<CalendarView events={events} month={month} initialDay={day} mode={mode} initialNow={now} canUpdate={context.canUpdate}/>:
       <p role="alert">予定を取得できませんでした。時間をおいて再読み込みしてください。</p>}
