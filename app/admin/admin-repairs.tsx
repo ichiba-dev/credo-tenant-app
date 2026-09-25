@@ -18,6 +18,7 @@ import MessageAttachment from "./message-attachment";
 import { repairListState } from "./repair-list-state";
 import RepairCalendarSection from "./repair-calendar-section";
 import { VendorDispatchSection } from "./vendor-dispatch-section";
+import styles from "./admin-workspace.module.css";
 
 function getDisplayPhotos(repair: {
   photo_url?: string | null;
@@ -86,20 +87,27 @@ export default function AdminRepairs({ repairs, canUpdate, children, calendarOve
     await save(id, "comment", comments[id] ?? repairs.find((repair) => repair.id === id)?.staff_comment ?? "");
   }
   return (
-    <main className="min-h-screen bg-gray-100 p-3 sm:p-6 xl:h-dvh xl:overflow-hidden">
-      <div className="mx-auto max-w-[1800px] xl:flex xl:h-full xl:min-h-0 xl:flex-col">
+    <main className={`${styles.workspace} min-h-screen bg-gray-100 p-3 sm:p-6 xl:h-dvh xl:overflow-hidden`}>
+      <div data-workspace-container className="mx-auto max-w-[1800px] xl:flex xl:h-full xl:min-h-0 xl:flex-col">
+        <header data-admin-header className="contents">
+          <div className="hidden items-center gap-4 text-[#0b2e59] xl:flex">
+            <span className="text-lg font-bold tracking-wide">CREDO <span className="text-sm font-medium">管理画面</span></span>
+            <span aria-hidden="true" className="text-slate-300">/</span>
+            <span className="text-sm font-semibold">修理管理</span>
+          </div>
         <nav className="mb-5 flex flex-wrap justify-end gap-2">
           <Link href="/admin/calendar" className="rounded-lg bg-blue-950 px-4 py-2 font-bold text-white shadow hover:bg-blue-900">カレンダー</Link>
           <Link href="/admin/vendors" className="rounded-lg bg-blue-950 px-4 py-2 font-bold text-white shadow hover:bg-blue-900">業者マスタ</Link>
         </nav>
+        </header>
         <RepairList repairs={repairs} calendarOverview={calendarOverview} calendarWeek={calendarWeek} listHeader={<>
         {children}
 
-        <h1 className="text-3xl font-bold">
+        <h1 className="text-3xl font-bold xl:sr-only">
           修理依頼一覧
         </h1>
 
-        <p className="mt-2 text-gray-500">
+        <p className="mt-2 text-gray-500 xl:hidden">
           入居者から送信された修理依頼です。
         </p>
 

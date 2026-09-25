@@ -18,7 +18,7 @@ export default function RepairDetailTabs({ repairId, active, desktop, sections }
     <section key={key} aria-label={label}>{sections[key]}</section>)}</div>;
   const select = (key: Tab) => { setTab(key); setVisited(previous => new Set(previous).add(key)); };
   return <div className="min-w-0 break-words [&_input]:min-w-0 [&_input]:max-w-full [&_select]:max-w-full">
-    <div role="tablist" aria-label="案件詳細" className="sticky top-0 z-10 flex flex-wrap gap-1 border-b bg-white pb-2">
+    <div data-detail-tabs role="tablist" aria-label="案件詳細" className="sticky top-0 z-10 flex flex-wrap gap-1 border-b bg-white pb-2">
       {DETAIL_TABS.map(([key, label], index) => <button key={key} type="button" role="tab"
         id={`repair-${repairId}-tab-${key}`} aria-controls={`repair-${repairId}-panel-${key}`}
         aria-selected={tab === key} tabIndex={tab === key ? 0 : -1}
@@ -29,7 +29,7 @@ export default function RepairDetailTabs({ repairId, active, desktop, sections }
           document.getElementById(`repair-${repairId}-tab-${DETAIL_TABS[next][0]}`)?.focus();
         }} className={`rounded px-3 py-2 text-xs font-semibold ${tab === key ? "bg-[#0b2e59] text-white" : "bg-slate-100 text-[#0b2e59]"}`}>{label}</button>)}
     </div>
-    {DETAIL_TABS.map(([key]) => visited.has(key) && <div key={key} role="tabpanel"
+    {DETAIL_TABS.map(([key]) => visited.has(key) && <div data-repair-panel key={key} role="tabpanel"
       id={`repair-${repairId}-panel-${key}`} aria-labelledby={`repair-${repairId}-tab-${key}`}
       hidden={tab !== key} tabIndex={0} className="py-3">{sections[key]}</div>)}
   </div>;

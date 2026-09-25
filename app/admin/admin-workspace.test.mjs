@@ -43,6 +43,8 @@ test('desktop selects center detail, highlights row, never mounts inline, and ca
  nodes(tree).find(n=>n.props?.id==='repair-detail-1').props.children[0].props.onClick({preventDefault(){prevented=true;}});
  tree=h.render();assert.ok(prevented);assert.deepEqual(h.calls,[{id:1,pc:true,active:true}]);
  const row=nodes(tree).find(n=>n.props?.id==='repair-detail-1');
+ const heading=renderToStaticMarkup(nodes(pane()).find(n=>n.props?.['data-case-header']));
+ for(const value of ['物件A','202','エアコン','入居者','受付'])assert.ok(heading.includes(value));
  assert.equal(row.props.children[0].props['aria-current'],'true');assert.ok(!nodes(row).some(n=>n.type==='p'&&n.props.children==='DETAIL_1'));
  assert.match(renderToStaticMarkup(pane()),/DETAIL_1/);
  nodes(tree).find(n=>n.props?.id==='repair-detail-2').props.children[0].props.onClick({preventDefault(){}});
@@ -51,14 +53,30 @@ test('desktop selects center detail, highlights row, never mounts inline, and ca
  assert.equal(nodes(pane()).find(n=>n.type==='div'&&n.key==='2').props.hidden,false);
 });
 
+test('desktop presentation fixes side widths, keeps the center fluid and scopes styling away from mobile',()=>{
+ const css=readFileSync(new URL('./admin-workspace.module.css',import.meta.url),'utf8');
+ assert.match(css,/@media \(min-width: 1280px\)/);
+ assert.match(css,/grid-template-columns: 320px minmax\(0, 1fr\) 320px/);
+ assert.match(css,/grid-template-columns: 320px minmax\(0, 1fr\) 400px/);
+ assert.match(css,/max-width: 1680px/);assert.match(css,/gap: 20px/);
+ assert.ok(css.indexOf('@media')<css.indexOf('.workspace'));
+ const h=listHarness(false),tree=h.render();
+ assert.match(nodes(tree).find(n=>n.props?.children==='今日のダッシュボード').props.className,/hidden.*xl:block/);
+ assert.ok(!nodes(tree).some(n=>n.props?.['data-case-header']));
+ const source=readFileSync(new URL('./admin-repairs.tsx',import.meta.url),'utf8');
+ assert.match(source,/<header data-admin-header className="contents">/);
+ assert.match(source,/hidden items-center gap-4.*xl:flex/);
+ assert.match(source,/修理管理/);
+});
+
 test('three scrollable panes and calendar expansion keep selected case and narrow-screen layout',()=>{
  const h=listHarness();let tree=h.render();
- assert.match(tree.props.className,/35fr.*40fr.*25fr/);
+ assert.equal(tree.props['data-calendar-expanded'],false);
  for(const label of ['今日やること・予定','修理案件一覧','選択中の案件詳細']) {
   const pane=nodes(tree).find(n=>n.props?.['aria-label']===label);assert.match(pane.props.className,/overflow-y-auto/);
  }
  const expand=nodes(tree).find(n=>n.props?.children==='カレンダーを広げる');expand.props.onClick();
- tree=h.render();assert.match(tree.props.className,/30fr.*35fr.*35fr/);
+ tree=h.render();assert.equal(tree.props['data-calendar-expanded'],true);
  assert.equal(nodes(tree).find(n=>n.props?.children==='カレンダーを縮める').props['aria-expanded'],true);
  assert.match(tree.props.className,/grid-cols-1/);
  const mobile=listHarness(false);tree=mobile.render();assert.ok(!nodes(tree).some(n=>n.props?.id==='selected-repair-pane'));
@@ -124,7 +142,7 @@ test('embedded week reuses day grouping and event list, changes day and omits em
 test('detail slots reuse LINE, dispatch, quotes, photos, calendar, timeline and owner UI with original permissions',()=>{
  const h=harness();const Stub=()=>null,Tabs=()=>null,List=()=>null;
  const imports={'react':h.hooks,'react/jsx-runtime':jsx,'next/navigation':{useRouter:()=>({refresh(){}})},
-  './actions':{},'./photo-actions':{},'./repair-pdf-button':{default:Stub},'@/app/components/repair-image':{default:Stub},
+  './admin-workspace.module.css':{default:{workspace:'workspace'}},'./actions':{},'./photo-actions':{},'./repair-pdf-button':{default:Stub},'@/app/components/repair-image':{default:Stub},
   './estimate-section':{default:Stub},'./message-section':{MessageSection:Stub},'./vendor-quote-upload-form':{VendorQuoteUploadForm:Stub},
   './vendor-dispatch-section':{VendorDispatchSection:Stub},'./repair-calendar-section':{default:Stub},'./repair-list':{default:List},
   './repair-list-state':helper,'./repair-detail-tabs':{default:Tabs},'./message-attachment':{default:Stub},'next/link':{default:Stub}};

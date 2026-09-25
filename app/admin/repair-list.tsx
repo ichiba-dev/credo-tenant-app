@@ -59,14 +59,15 @@ export default function RepairList({repairs, renderDetail, calendarOverview, cal
   const visibleCount = repairs.filter(visible).length;
   const countLabel = filter === "active" ? "未完了" : filter === "all" ? "表示" : filters.find(item => item.key === filter)?.label;
   const selected=repairs.find(repair=>repair.id===selectedId);
-  return <div className={`grid min-w-0 grid-cols-1 items-start gap-4 xl:min-h-0 xl:flex-1 xl:items-stretch ${calendarExpanded?'xl:grid-cols-[minmax(0,30fr)_minmax(0,35fr)_minmax(0,35fr)]':'xl:grid-cols-[minmax(0,35fr)_minmax(0,40fr)_minmax(0,25fr)]'}`}>
-    <aside aria-label="今日やること・予定" tabIndex={0} onClickCapture={event=>{
+  return <div data-workspace-layout data-calendar-expanded={calendarExpanded} className="grid min-w-0 grid-cols-1 items-start gap-4 xl:min-h-0 xl:flex-1 xl:items-stretch">
+    <aside data-workspace-dashboard aria-label="今日やること・予定" tabIndex={0} onClickCapture={event=>{
       if(!desktop||event.button!==0||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
       const href=(event.target as HTMLElement).closest('a')?.getAttribute('href');
       const match=href&&/^\/admin#repair-detail-(\d+)$/.exec(href);
       if(match&&repairs.some(repair=>repair.id===Number(match[1]))){event.preventDefault();selectRepair(Number(match[1]));}
     }}
       className="min-w-0 xl:sticky xl:top-0 xl:col-start-3 xl:row-start-1 xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain xl:pr-1">
+    <h2 className="hidden font-bold text-[#0b2e59] xl:block">今日のダッシュボード</h2>
     <RepairTodos repairs={repairs} onSelect={selectRepair} />
     {calendarOverview}
     <div className="hidden xl:block">
@@ -76,10 +77,10 @@ export default function RepairList({repairs, renderDetail, calendarOverview, cal
     </div>
     <a href="/admin/calendar" className="inline-flex min-h-11 items-center rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-[#0b2e59] underline">カレンダーを開く</a>
     </aside>
-    <section className="min-w-0 xl:col-start-1 xl:row-start-1 xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain xl:pr-1" aria-label="修理案件一覧">
+    <section data-workspace-list className="min-w-0 xl:col-start-1 xl:row-start-1 xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain xl:pr-1" aria-label="修理案件一覧">
     {listHeader}
     <h2 className="mb-3 font-bold text-[#0b2e59]">修理依頼一覧</h2>
-    <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 xl:grid-cols-3">
+    <div data-repair-summary className="grid grid-cols-3 gap-2 sm:grid-cols-5 xl:grid-cols-3">
       {filters.map(item => <button key={item.key} type="button" aria-pressed={filter===item.key}
         onClick={() => setFilter(item.key)} className={`rounded-xl border p-3 text-left ${filter===item.key ? "border-[#0b2e59] bg-[#0b2e59] text-white" : "border-slate-200 bg-white text-[#0b2e59]"}`}>
         <span className="block text-xs">{item.label}</span><strong className="text-xl">{repairs.filter(r => matchesRepairFilter(repairListState(r),item.key)).length}</strong><span className="ml-1 text-xs">件</span>
@@ -101,13 +102,13 @@ export default function RepairList({repairs, renderDetail, calendarOverview, cal
       {groups.map(group => {
         const count = group.repairs.filter(visible).length;
         return <div key={group.property} hidden={count===0}>
-          <details open className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <details data-property-group open className="overflow-hidden rounded-xl border border-slate-200 bg-white">
             <summary className="cursor-pointer bg-[#0b2e59] px-4 py-3 text-sm font-bold text-white">{group.property}<span className="ml-3 font-normal">{countLabel}{count} / 全{group.repairs.length}{search.trim() && "（検索一致分）"}</span></summary>
             {group.repairs.map(repair => {
               const state = repairListState(repair);
               return <div key={repair.id} hidden={!visible(repair)} className="border-t border-slate-100">
                 <details id={`repair-detail-${repair.id}`} onToggle={event => {if(event.currentTarget.open) setVisited(previous => new Set(previous).add(repair.id));}}>
-                  <summary aria-current={desktop&&selectedId===repair.id?'true':undefined}
+                  <summary data-repair-row aria-current={desktop&&selectedId===repair.id?'true':undefined}
                     onClick={event=>{if(desktop){event.preventDefault();setVisited(previous=>new Set(previous).add(repair.id));setSelectedId(repair.id);setJumpId(repair.id);}}}
                     className={`cursor-pointer list-none px-4 py-3 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-blue-700 ${desktop&&selectedId===repair.id?'border-l-4 border-[#0b2e59] bg-blue-50':''}`}>
                     <span className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)_auto] md:items-center xl:grid-cols-2">
@@ -127,10 +128,16 @@ export default function RepairList({repairs, renderDetail, calendarOverview, cal
       })}
     </div>
   </section>
-  {desktop&&<section id="selected-repair-pane" aria-label="選択中の案件詳細" tabIndex={-1}
+  {desktop&&<section data-workspace-detail id="selected-repair-pane" aria-label="選択中の案件詳細" tabIndex={-1}
     className="min-h-0 min-w-0 overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-white p-3 xl:col-start-2 xl:row-start-1">
     {!selected?<p className="p-4 text-sm text-slate-500">{repairs.length?'左の一覧から案件を選択してください。':'表示する案件はありません。'}</p>:
-      <h2 className="mb-3 break-words font-bold text-[#0b2e59]">{selected.property_name} {selected.room_number}号室 · {selected.category}</h2>}
+      <header data-case-header className="space-y-2">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <h2 className="min-w-0 break-words text-xl font-bold text-[#0b2e59]">{selected.property_name} {selected.room_number}号室</h2>
+          <span className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-semibold text-[#0b2e59]">{selected.status}</span>
+        </div>
+        <p className="text-sm text-slate-600">{selected.category} <span className="mx-2 text-slate-300">/</span> 入居者：{selected.tenant_name}</p>
+      </header>}
     {repairs.filter(repair=>visited.has(repair.id)).map(repair=><div key={repair.id} hidden={repair.id!==selectedId}>
       {renderDetail(repair,true,repair.id===selectedId)}
     </div>)}

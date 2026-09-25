@@ -1,0 +1,68 @@
+/* Desktop presentation only. Mobile and shared feature components keep their styles. */
+@media (min-width: 1280px) {
+  .workspace { background: #f4f6f9; padding: 20px 24px; }
+  .workspace [data-workspace-container] { max-width: 1680px; }
+  .workspace [data-admin-header] {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0; gap: 24px; margin-bottom: 20px; padding-bottom: 16px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .workspace [data-admin-header] nav { margin: 0; }
+  .workspace [data-admin-header] nav a {
+    border-radius: 8px; background: white; color: #0b2e59;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 4%); font-size: 13px; font-weight: 600;
+  }
+  .workspace [data-admin-header] nav a:hover { background: #e8eef6; }
+  .workspace [data-workspace-layout] { grid-template-columns: 320px minmax(0, 1fr) 320px; gap: 20px; }
+  .workspace [data-workspace-layout][data-calendar-expanded="true"] {
+    grid-template-columns: 320px minmax(0, 1fr) 400px;
+  }
+  .workspace [data-workspace-list] { padding-right: 4px; }
+  .workspace [data-workspace-list] > h2 { font-size: 14px; margin-bottom: 16px; }
+  .workspace [data-repair-summary] { display: flex; flex-wrap: wrap; gap: 4px; }
+  .workspace [data-repair-summary] button {
+    border: 0; border-radius: 8px; padding: 8px; display: flex;
+    align-items: baseline; gap: 4px; background: transparent;
+  }
+  .workspace [data-repair-summary] button[aria-pressed="true"] { background: #0b2e59; }
+  .workspace [data-repair-summary] strong { font-size: 16px; }
+  .workspace [data-repair-summary] button > span:last-child { margin-left: 0; font-size: 10px; }
+  .workspace [data-property-group] { border: 0; border-radius: 8px; background: transparent; }
+  .workspace [data-property-group] > summary {
+    background: #e9edf3; color: #0b2e59; padding: 12px; font-size: 13px;
+  }
+  .workspace [data-property-group] > summary > span { display: block; margin: 4px 0 0; font-size: 11px; color: #64748b; }
+  .workspace [data-repair-row] { border-radius: 8px; padding: 12px; }
+  .workspace [data-repair-row]:hover { background: #edf2f8; }
+  .workspace [data-repair-row][aria-current="true"] { background: #e5edf8; }
+  .workspace [data-workspace-detail] {
+    border: 0; padding: 24px; border-radius: 12px;
+    box-shadow: 0 2px 8px rgb(15 23 42 / 5%);
+  }
+  .workspace [data-case-header] { padding-bottom: 20px; }
+  .workspace [data-detail-tabs] {
+    top: -24px; margin: 0 -24px; padding: 12px 24px;
+    border-color: #e8edf3; gap: 4px; box-shadow: 0 2px 3px rgb(15 23 42 / 2%);
+  }
+  .workspace [data-detail-tabs] button { border-radius: 8px; padding: 8px 10px; }
+  .workspace [data-detail-tabs] button[aria-selected="false"] { background: transparent; color: #64748b; }
+  .workspace [data-detail-tabs] button:hover { background: #e8eef6; color: #0b2e59; }
+  .workspace [data-repair-panel] { padding: 20px 0 0; }
+  /* Flatten only section wrappers, preserving nested messages, alerts and form controls. */
+  .workspace [data-repair-panel] > section,
+  .workspace [data-repair-panel] > div > section {
+    margin-top: 0; border: 0; border-radius: 0; padding: 0; background: transparent;
+  }
+  .workspace [data-repair-panel] > section + section { margin-top: 20px; }
+  .workspace [data-workspace-dashboard] { padding: 0 4px 0 0; }
+  .workspace [data-workspace-dashboard] > section,
+  .workspace [data-workspace-dashboard] > div > section {
+    border: 0; border-radius: 0; background: transparent; padding: 16px 0;
+    margin: 0; border-bottom: 1px solid #e2e8f0;
+  }
+  .workspace [data-workspace-dashboard] h2 { font-size: 14px; }
+  .workspace [data-workspace-dashboard] > h2 { margin-bottom: 0; font-size: 16px; }
+  .workspace [aria-labelledby="repair-todos-heading"] > div { gap: 4px; }
+  .workspace [aria-labelledby="repair-todos-heading"] > div button { padding: 6px 8px; border-color: transparent; }
+  .workspace [aria-labelledby="repair-todos-heading"] > p { font-size: 11px; line-height: 1.6; }
+}

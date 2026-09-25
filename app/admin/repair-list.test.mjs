@@ -144,13 +144,13 @@ test('three-pane classes share one todo instance; mobile keeps todo, calendar, t
  const overview=React.createElement('div',null,'TODAY_AND_TOMORROW');
  const tree=MockList({repairs:[base],calendarOverview:overview,listHeader:React.createElement('h1',null,'REPAIR_HEADER'),renderDetail:()=>null});
  assert.match(tree.props.className,/grid-cols-1/);
- assert.ok(tree.props.className.includes('xl:grid-cols-[minmax(0,35fr)_minmax(0,40fr)_minmax(0,25fr)]'));
+ assert.equal(tree.props['data-calendar-expanded'],false);
  const [sidebar,primary]=tree.props.children;
  assert.equal(sidebar.type,'aside');assert.equal(sidebar.props.tabIndex,0);
  for(const rule of ['xl:sticky','xl:top-0','xl:col-start-3','xl:min-h-0','xl:overflow-y-auto'])assert.ok(sidebar.props.className.includes(rule));
  assert.equal(primary.type,'section');assert.match(primary.props.className,/xl:col-start-1/);
  assert.equal(nodes(tree).filter(node=>node.props?.onSelect).length,1);
- assert.equal(sidebar.props.children[1],overview);
+ assert.equal(sidebar.props.children[2],overview);
  const html=renderToStaticMarkup(tree);
  assert.ok(html.indexOf('今日やること')<html.indexOf('TODAY_AND_TOMORROW'));
  assert.ok(html.indexOf('TODAY_AND_TOMORROW')<html.indexOf('REPAIR_HEADER'));
@@ -190,7 +190,7 @@ test('repair row still mounts the existing detail only after opening',()=>{
 test('admin composition widens the container and preserves viewer restrictions and detail components',()=>{
  const Stub=()=>null;
  const Admin=load('./admin-repairs.tsx',{'react':React,'react/jsx-runtime':jsx,'next/navigation':{useRouter:()=>({refresh(){}})},
-  './repair-detail-tabs':{default:Stub},'./message-attachment':{default:Stub},'./repair-list-state':helper,'./actions':{},'./photo-actions':{},'./repair-pdf-button':{default:Stub},'@/app/components/repair-image':{default:Stub},
+  './repair-detail-tabs':{default:Stub},'./message-attachment':{default:Stub},'./repair-list-state':helper,'./admin-workspace.module.css':{default:{workspace:'workspace'}},'./actions':{},'./photo-actions':{},'./repair-pdf-button':{default:Stub},'@/app/components/repair-image':{default:Stub},
   './estimate-section':{default:Stub},'./message-section':{MessageSection:Stub},'./vendor-quote-upload-form':{VendorQuoteUploadForm:Stub},
   './vendor-dispatch-section':{VendorDispatchSection:Stub},'./repair-calendar-section':{default:Stub},'./repair-list':{default:List},
   'next/link':{default:({children,...props})=>React.createElement('a',props,children)}}).default;
