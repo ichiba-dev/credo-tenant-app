@@ -295,3 +295,42 @@ test('detail dialog permits scheduled staff edits, read-only viewer/closed histo
  assert.doesNotMatch(render(false),/>編集<|>完了<\/button>|>キャンセル<\/button>/);
  for(const status of ['completed','cancelled'])assert.doesNotMatch(render(true,status),/>編集<|>完了<\/button>|>キャンセル<\/button>/);
 });
+
+for(const mode of ['month','week','day'])test(`selected-day count/list and ${mode} calendar share refreshed create/edit/status/date changes`,()=>{
+ const hooks=hookHarness();
+ const View=load('./calendar/calendar-view.tsx',{...viewImports,'react':hooks.hooks,'react/jsx-runtime':jsx,'next/link':{default:Link},'./month-grid':grid,'../calendar-state':state,'../calendar-events-list':{default:Lists}}).default;
+ const props={events:[],month:'2026-09',initialDay:'2026-09-25',initialNow:Date.parse('2026-09-25T00:00:00Z'),canUpdate:true,mode};
+ const appointment={...event,title:'同期確認',starts_at:'2026-09-25T02:00:00Z',ends_at:'2026-09-25T03:00:00Z'};
+ const render=()=>{
+  const tree=hooks.render(View,props),nodes=nodesOf(tree);
+  const section=nodes.find(n=>n.props?.id==='selected-day-events');
+  const list=nodes.find(n=>n.type===Lists);
+  const calendar=nodes.find(n=>n.type===(mode==='month'?Month:Timeline));
+  const expected=state.eventsOnDay(calendar.props.events,props.initialDay);
+  assert.deepEqual(list?.props.events??[],expected);
+  const html=renderToStaticMarkup(section);
+  assert.match(html,new RegExp(`>${expected.length}件<`));
+  if(!expected.length){assert.equal(list,undefined);assert.match(html,/予定はありません/);assert.doesNotMatch(html,/同期確認/);}
+  return {section,html};
+ };
+ let previous=render();
+ for(const updated of [appointment,
+  {...appointment,starts_at:'2026-09-25T02:30:00Z',ends_at:'2026-09-25T03:30:00Z',title:'同期確認 編集後'},
+  {...appointment,status:'completed'}, {...appointment,status:'cancelled'}]) {
+  props.events=[updated];const current=render();
+  // A refresh must replace the entire selected-day subtree, even for same-ID edits.
+  assert.notEqual(current.section.key,previous.section.key);
+  assert.match(current.html,new RegExp(state.eventTime(updated)));
+  if(updated.starts_at!==appointment.starts_at){assert.doesNotMatch(current.html,/11:00/);assert.match(current.html,/編集後/);}
+  if(updated.status==='completed')assert.match(current.html,/完了/);
+  if(updated.status==='cancelled')assert.match(current.html,/キャンセル/);
+  assert.equal(render().section.key,current.section.key);previous=current;
+ }
+ // Moving the same event to tomorrow removes both today's row and its count.
+ props.events=[{...appointment,starts_at:'2026-09-26T02:30:00Z',ends_at:'2026-09-26T03:30:00Z'}];
+ const empty=render();assert.notEqual(empty.section.key,previous.section.key);
+ props.initialDay='2026-09-26';const tomorrow=render();assert.notEqual(tomorrow.section.key,empty.section.key);assert.match(tomorrow.html,/11:30/);
+ // An edit only to the end time/notes must also invalidate the selected-day view.
+ props.events=[{...props.events[0],ends_at:'2026-09-26T04:00:00Z',notes:'最新メモ'}];
+ const changed=render();assert.notEqual(changed.section.key,tomorrow.section.key);assert.match(changed.html,/最新メモ/);
+});

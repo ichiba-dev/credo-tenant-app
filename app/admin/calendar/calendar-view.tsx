@@ -29,6 +29,9 @@ export default function CalendarView({events,month,initialDay,initialNow,canUpda
   const today=japanDay(now), week=weekDays(day);
   const visible=events.filter(e => !filters.hiddenTypes.includes(e.event_type));
   const selected=eventsOnDay(visible,day);
+  // Refresh preserves client subtrees. Replace the count and list together when
+  // the selected day's data changes, including edits that keep the same event ID.
+  const selectedRevision=JSON.stringify([day,selected]);
   const types=Array.from(new Set([...Object.keys(TYPE_LABELS), ...events.map(e => e.event_type)]));
   const desktopMode=mode==='auto'?'week':mode;
   const mobileMode=mode==='day'?'day':'month';
@@ -76,7 +79,7 @@ export default function CalendarView({events,month,initialDay,initialNow,canUpda
         </div>
         {desktopMode==='week'&&<div className="hidden md:block"><CalendarTimeline events={visible} days={week} day={day} now={now} onSelect={selectDay} onEvent={openEvent} onCreate={canUpdate?create:undefined}/></div>}
         {desktopMode==='day'&&<CalendarTimeline events={visible} days={[day]} day={day} now={now} onSelect={selectDay} onEvent={openEvent} onCreate={canUpdate?create:undefined}/>}
-        <section id="selected-day-events" className="mt-4 min-w-0 rounded-lg border border-slate-200 bg-white p-4" aria-labelledby="selected-day-title">
+        <section key={selectedRevision} id="selected-day-events" className="mt-4 min-w-0 rounded-lg border border-slate-200 bg-white p-4" aria-labelledby="selected-day-title">
           {canUpdate&&<button type="button" onClick={()=>create(day)} className="mb-3 w-full rounded-lg bg-[#0b2e59] px-4 py-3 text-sm font-semibold text-white sm:w-auto">＋予定を作成</button>}
           <h2 id="selected-day-title" aria-live="polite" className="font-bold text-[#0b2e59]">{Number(day.slice(5,7))}月{Number(day.slice(-2))}日の予定 <span className="text-sm font-normal">{selected.length}件</span></h2>
           {selected.length?<CalendarEventsList events={selected} now={now} canUpdate={canUpdate} onEvent={openEvent}/>:<p className="mt-2 text-sm text-slate-500">予定はありません。</p>}
