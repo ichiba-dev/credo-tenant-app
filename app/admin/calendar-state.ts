@@ -5,6 +5,7 @@ export type CalendarEvent = {
   vendor_dispatch_id: string | null; notes: string | null; source_type: string;
 };
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export type CalendarRepair = {id:number;property_name:string;room_number:string;category:string};
 export function japanDay(now: number) { return new Date(now+9*3600000).toISOString().slice(0,10); }
 export function nextDay(day: string, offset=1) { return new Date(Date.parse(day+'T00:00:00Z')+offset*86400000).toISOString().slice(0,10); }
 export function localInstant(day: string, time: string) {
@@ -38,8 +39,11 @@ export function pastPendingEvents(events: CalendarEvent[], now: number) {
 export function parseCalendarInput(input: unknown) {
   if (!input || typeof input!=='object') return null;
   const v=input as Record<string,unknown>;
-  if (typeof v.id!=='string' || !UUID.test(v.id) || !Number.isSafeInteger(v.repairId) || Number(v.repairId)<=0 ||
+  if (typeof v.id!=='string' || !UUID.test(v.id) || (v.repairId!==null&&(!Number.isSafeInteger(v.repairId) || Number(v.repairId)<=0)) ||
     (v.dispatchId!==null && (typeof v.dispatchId!=='string'||!UUID.test(v.dispatchId))) ||
+    (v.repairId===null&&v.dispatchId!==null) ||
+    (v.title!==undefined&&(typeof v.title!=='string'||!v.title.trim()||v.title.trim().length>300)) ||
+    ((v.repairId===null||v.edit===true)&&typeof v.title!=='string') ||
     typeof v.eventType!=='string' || !Object.hasOwn(EVENT_TYPES,v.eventType) ||
     typeof v.date!=='string' || typeof v.start!=='string' || typeof v.end!=='string' ||
     typeof v.notes!=='string' || v.notes.length>3000 || typeof v.allDay!=='boolean' || typeof v.edit!=='boolean') return null;
@@ -47,6 +51,6 @@ export function parseCalendarInput(input: unknown) {
   if (!starts) return null;
   const ends=v.allDay ? localInstant(nextDay(v.date),'00:00') : v.end ? localInstant(v.date,v.end) : null;
   if ((!v.allDay&&v.end&&!ends) || (ends&&ends<=starts)) return null;
-  return {id:v.id,repairId:Number(v.repairId),dispatchId:v.dispatchId as string|null,eventType:v.eventType as keyof typeof EVENT_TYPES,
+  return {id:v.id,title:typeof v.title==='string'?v.title.trim():null,repairId:v.repairId===null?null:Number(v.repairId),dispatchId:v.dispatchId as string|null,eventType:v.eventType as keyof typeof EVENT_TYPES,
     starts,ends,notes:v.notes.trim()||null,allDay:v.allDay,edit:v.edit};
 }

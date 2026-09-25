@@ -4,10 +4,12 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { eventsOnDay, japanDay, type CalendarEvent } from "../calendar-state";
 import { monthDays, shiftMonth } from "./month-grid";
-import { moveDate, TYPE_LABELS, typeLabel, weekDays, type CalendarMode } from "./scheduler";
+import { calendarDraft, moveDate, TYPE_LABELS, typeLabel, weekDays, type CalendarMode } from "./scheduler";
 import CalendarEventsList from "../calendar-events-list";
 import CalendarMonth from "./calendar-month";
 import CalendarTimeline from "./calendar-timeline";
+
+import CalendarEventDialog, {type CalendarDraft} from "./calendar-event-dialog";
 
 const control = "rounded-md border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-[#0b2e59]";
 const shortDate = (day: string) => `${Number(day.slice(5,7))}/${Number(day.slice(-2))}`;
@@ -17,6 +19,9 @@ export default function CalendarView({events,month,initialDay,initialNow,canUpda
 }) {
   const router = useRouter();
   const day = initialDay;
+  const [panel,setPanel]=useState<{eventId?:string;draft?:CalendarDraft}|null>(null);
+  const openEvent=(event:CalendarEvent)=>setPanel({eventId:event.id});
+  const create=(date:string,minutes=540)=>{if(canUpdate)setPanel({draft:calendarDraft(date,minutes)});};
   const [now,setNow] = useState(initialNow);
   // A filter group can be extended without introducing fictitious assignee/store data.
   const [filters,setFilters] = useState<{hiddenTypes:string[]}>({hiddenTypes:[]});
@@ -44,7 +49,7 @@ export default function CalendarView({events,month,initialDay,initialNow,canUpda
     </div>
   </div>;
   return <>
-    <header className="mb-4 text-[#0b2e59]">{toolbar(desktopMode,false)}{toolbar(mobileMode,true)}<p className="mt-2 text-xs text-slate-500">日本時間 · 案件に紐付いた予定をクリックすると詳細を開きます</p></header>
+    <header className="mb-4 text-[#0b2e59]">{toolbar(desktopMode,false)}{toolbar(mobileMode,true)}<p className="mt-2 text-xs text-slate-500">日本時間 · 予定をクリックすると詳細を開きます{canUpdate?' · 空き時間から予定を作成できます':''}</p></header>
     <div className="flex items-start gap-4">
       <aside aria-label="カレンダーとフィルター" className="hidden w-52 shrink-0 space-y-6 rounded-lg border border-slate-200 bg-white p-3 md:block">
         <section aria-label="ミニ月間カレンダー">
@@ -67,15 +72,17 @@ export default function CalendarView({events,month,initialDay,initialNow,canUpda
       <div className="min-w-0 flex-1">
         {filters.hiddenTypes.length>0&&<p role="status" className="mb-2 flex items-center gap-3 text-xs text-slate-600">予定種類で絞り込み中<button type="button" className="underline" onClick={() => setFilters({hiddenTypes:[]})}>すべて表示</button></p>}
         <div className={desktopMode==='month'?'':'md:hidden'}>
-          {mobileMode==='month' || desktopMode==='month' ? <CalendarMonth events={visible} month={month} day={day} today={today} onSelect={selectDay}/> : null}
+          {mobileMode==='month' || desktopMode==='month' ? <CalendarMonth events={visible} month={month} day={day} today={today} onSelect={selectDay} onEvent={openEvent}/> : null}
         </div>
-        {desktopMode==='week'&&<div className="hidden md:block"><CalendarTimeline events={visible} days={week} day={day} now={now} onSelect={selectDay}/></div>}
-        {desktopMode==='day'&&<CalendarTimeline events={visible} days={[day]} day={day} now={now} onSelect={selectDay}/>}
+        {desktopMode==='week'&&<div className="hidden md:block"><CalendarTimeline events={visible} days={week} day={day} now={now} onSelect={selectDay} onEvent={openEvent} onCreate={canUpdate?create:undefined}/></div>}
+        {desktopMode==='day'&&<CalendarTimeline events={visible} days={[day]} day={day} now={now} onSelect={selectDay} onEvent={openEvent} onCreate={canUpdate?create:undefined}/>}
         <section id="selected-day-events" className="mt-4 min-w-0 rounded-lg border border-slate-200 bg-white p-4" aria-labelledby="selected-day-title">
+          {canUpdate&&<button type="button" onClick={()=>create(day)} className="mb-3 w-full rounded-lg bg-[#0b2e59] px-4 py-3 text-sm font-semibold text-white sm:w-auto">＋予定を作成</button>}
           <h2 id="selected-day-title" aria-live="polite" className="font-bold text-[#0b2e59]">{Number(day.slice(5,7))}月{Number(day.slice(-2))}日の予定 <span className="text-sm font-normal">{selected.length}件</span></h2>
-          {selected.length?<CalendarEventsList events={selected} now={now} canUpdate={canUpdate}/>:<p className="mt-2 text-sm text-slate-500">予定はありません。</p>}
+          {selected.length?<CalendarEventsList events={selected} now={now} canUpdate={canUpdate} onEvent={openEvent}/>:<p className="mt-2 text-sm text-slate-500">予定はありません。</p>}
         </section>
       </div>
     </div>
+    {panel&&(panel.draft||events.some(e=>e.id===panel.eventId))&&<CalendarEventDialog key={panel.eventId??`${panel.draft?.day}-${panel.draft?.start}`} event={events.find(e=>e.id===panel.eventId)} draft={panel.draft} canUpdate={canUpdate} onClose={()=>setPanel(null)} onSaved={()=>{setPanel(null);setFilters({hiddenTypes:[]});}}/>}
   </>;
 }

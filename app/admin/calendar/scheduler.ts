@@ -52,3 +52,9 @@ export function layoutDay(events: CalendarEvent[], day: string) {
   finish();
   return slots;
 }
+
+export function calendarDraft(day:string, minutes=540) {
+  const start=Math.max(0,Math.min(1410,Math.floor(minutes/30)*30));
+  const time=(value:number)=>`${String(Math.floor(value/60)).padStart(2,'0')}:${String(value%60).padStart(2,'0')}`;
+  return {day,start:time(start),end:time(Math.min(1439,start+60))};
+}

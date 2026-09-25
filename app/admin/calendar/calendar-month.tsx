@@ -1,8 +1,8 @@
 import { eventsOnDay, eventTime, type CalendarEvent } from "../calendar-state";
 import { monthDays } from "./month-grid";
 
-export default function CalendarMonth({events,month,day,today,onSelect}: {
-  events:CalendarEvent[];month:string;day:string;today:string;onSelect:(day:string)=>void;
+export default function CalendarMonth({events,month,day,today,onSelect,onEvent}: {
+  events:CalendarEvent[];month:string;day:string;today:string;onSelect:(day:string)=>void;onEvent?:(event:CalendarEvent)=>void;
 }) {
   const setDay=onSelect;
   return (<div className="overflow-hidden rounded-lg border border-slate-200 bg-white" aria-label={`${month}のカレンダー`}>
@@ -23,8 +23,8 @@ export default function CalendarMonth({events,month,day,today,onSelect}: {
               {items.slice(0,3).map(e=>{
                 const label=`${eventTime(e)} ${e.title}${e.status==='completed'?'（完了）':e.status==='cancelled'?'（キャンセル）':''}`;
                 const style=`block truncate rounded px-1 py-0.5 text-xs ${e.status==='scheduled'?'bg-slate-100 text-[#0b2e59] hover:bg-blue-100':'text-slate-400'} ${current?'':'opacity-60'}`;
-                return e.repair_request_id?<a key={e.id} href={`/admin#repair-detail-${e.repair_request_id}`} className={style} title={label}>{label}</a>:
-                  <button key={e.id} type="button" onClick={()=>setDay(d)} className={`${style} w-full text-left`} title={label}>{label}</button>;
+                return !onEvent&&e.repair_request_id?<a key={e.id} href={`/admin#repair-detail-${e.repair_request_id}`} className={style} title={label}>{label}</a>:
+                  <button key={e.id} type="button" onClick={()=>onEvent?onEvent(e):setDay(d)} className={`${style} w-full text-left`} title={label}>{label}</button>;
               })}
               {items.length>3&&<button type="button" onClick={()=>setDay(d)} className="px-1 text-xs text-slate-600 underline" aria-label={`${d}の予定をすべて表示`}>他{items.length-3}件</button>}
             </div>
