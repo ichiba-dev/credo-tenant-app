@@ -13,6 +13,9 @@ import { MessageSection } from "./message-section";
 import { VendorQuoteUploadForm } from "./vendor-quote-upload-form";
 import Link from "next/link";
 import RepairList from "./repair-list";
+import RepairDetailTabs from "./repair-detail-tabs";
+import MessageAttachment from "./message-attachment";
+import { repairListState } from "./repair-list-state";
 import RepairCalendarSection from "./repair-calendar-section";
 import { VendorDispatchSection } from "./vendor-dispatch-section";
 
@@ -33,7 +36,7 @@ function getDisplayPhotos(repair: {
       : [];
 }
 
-export default function AdminRepairs({ repairs, canUpdate, children, calendarOverview, replyScope }: { repairs: AdminRepair[]; canUpdate: boolean; children?: ReactNode; calendarOverview?: ReactNode; replyScope?: string }) {
+export default function AdminRepairs({ repairs, canUpdate, children, calendarOverview, calendarWeek, replyScope }: { repairs: AdminRepair[]; canUpdate: boolean; children?: ReactNode; calendarOverview?: ReactNode; calendarWeek?: ReactNode; replyScope?: string }) {
   const router = useRouter();
   const [comments, setComments] = useState<{ [key: number]: string }>({});
   const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null);
@@ -83,13 +86,13 @@ export default function AdminRepairs({ repairs, canUpdate, children, calendarOve
     await save(id, "comment", comments[id] ?? repairs.find((repair) => repair.id === id)?.staff_comment ?? "");
   }
   return (
-    <main className="min-h-screen bg-gray-100 p-3 sm:p-6">
-      <div className="mx-auto max-w-[1600px]">
+    <main className="min-h-screen bg-gray-100 p-3 sm:p-6 xl:h-dvh xl:overflow-hidden">
+      <div className="mx-auto max-w-[1800px] xl:flex xl:h-full xl:min-h-0 xl:flex-col">
         <nav className="mb-5 flex flex-wrap justify-end gap-2">
           <Link href="/admin/calendar" className="rounded-lg bg-blue-950 px-4 py-2 font-bold text-white shadow hover:bg-blue-900">カレンダー</Link>
           <Link href="/admin/vendors" className="rounded-lg bg-blue-950 px-4 py-2 font-bold text-white shadow hover:bg-blue-900">業者マスタ</Link>
         </nav>
-        <RepairList repairs={repairs} calendarOverview={calendarOverview} listHeader={<>
+        <RepairList repairs={repairs} calendarOverview={calendarOverview} calendarWeek={calendarWeek} listHeader={<>
         {children}
 
         <h1 className="text-3xl font-bold">
@@ -102,8 +105,9 @@ export default function AdminRepairs({ repairs, canUpdate, children, calendarOve
 
         <p role="status" className="mt-3 text-sm">{isSaving ? "保存中…" : message}</p>
         {!canUpdate && <p className="mt-3 text-sm">閲覧専用です。ステータス・コメントは更新できません。</p>}
-        </>} renderDetail={(repair) => (
-           <div>
+        </>} renderDetail={(repair, desktop = false, active = true) => (
+          <RepairDetailTabs repairId={repair.id} desktop={desktop} active={active} sections={{
+            overview: <>
              <p className="font-bold">
                {repair.property_name} {repair.room_number}号室
              </p>
@@ -116,35 +120,6 @@ export default function AdminRepairs({ repairs, canUpdate, children, calendarOve
               <p className="text-gray-500">
                 {repair.description}
               </p>
-              {(() => {
-                const photos = getDisplayPhotos(repair);
-
-                return photos.length > 0 ? (
-                  <section className="mt-4">
-                    <p className="mb-2 text-sm font-bold text-gray-700">写真</p>
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                      {photos.map((photo, index) => (
-                        <button
-                          key={`${photo.sort_order}-${photo.photo_url}`}
-                          type="button"
-                          onClick={() => openPhoto(repair.id, index)}
-                          className="overflow-hidden rounded-lg border bg-white text-left shadow-sm"
-                        >
-                          <RepairImage
-                            src={photo.photo_url}
-                            alt={`修理写真 ${index + 1}`}
-                            className="aspect-square w-full object-cover"
-                          />
-                          <span className="block px-2 py-1.5 text-xs text-gray-600">
-                            写真 {index + 1}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </section>
-                ) : null;
-              })()}
-
               <p className="mt-2 text-sm text-gray-400">
                 受付日：
                 {new Date(repair.created_at).toLocaleDateString("ja-JP")}
@@ -153,21 +128,8 @@ export default function AdminRepairs({ repairs, canUpdate, children, calendarOve
               <p className="mt-2 font-bold">
                ステータス：{repair.status}
                </p>
-              <MessageSection repairId={repair.id} messages={repair.tenant_messages ?? []} canUpdate={canUpdate} lineUnavailable={repair.line_messages_unavailable} attachmentsUnavailable={repair.line_attachments_unavailable} replyScope={replyScope} />
-              <VendorDispatchSection repairId={repair.id} candidates={repair.vendor_candidates ?? []}
-                dispatches={repair.vendor_dispatches ?? []} canUpdate={canUpdate}
-                unavailable={repair.vendor_dispatch_unavailable}
-                suggestedInstructions="現地確認と修理見積をお願いします。"
-                propertyName={repair.property_name} roomNumber={repair.room_number}
-                repairCategory={repair.category} repairDescription={repair.description}
-                repairPhotos={repair.repair_photos ?? []} fallbackPhotoUrl={repair.photo_url}
-                tenantMessages={repair.tenant_messages ?? []}
-                managementCompanyName="株式会社CREDO" />
-              {canUpdate && repair.vendor_dispatches?.filter((dispatch) =>
-                !["candidate","cancelled"].includes(dispatch.status)).map((dispatch) =>
-                <VendorQuoteUploadForm key={dispatch.id} repairId={repair.id} dispatchId={dispatch.id} />)}
-              <RepairCalendarSection repair={repair} />
-
+              <p className="mt-2 text-sm text-slate-600">次にやること：{repairListState(repair).reasons.join(' / ')||'追加の要対応なし'}</p>
+              <p className="text-xs text-slate-500">最終更新（確認可能分）：{repairListState(repair).updatedAt > 0 ? new Date(repairListState(repair).updatedAt).toLocaleString('ja-JP', {timeZone:'Asia/Tokyo'}) : '日時不明'}</p>
               <textarea
                 readOnly={!canUpdate}
                 className="mt-4 w-full rounded border p-2"
@@ -188,12 +150,6 @@ export default function AdminRepairs({ repairs, canUpdate, children, calendarOve
 >
                  コメント保存
                  </button>
-
-                 <RepairPdfButton repairId={repair.id} />
-
-                 <EstimateSection repairId={repair.id} estimates={repair.owner_report_estimates} canUpdate={canUpdate} initialSummary={repair.description} />
-               
-
 
                <div className="mt-4 flex gap-2">
                <button
@@ -220,7 +176,65 @@ export default function AdminRepairs({ repairs, canUpdate, children, calendarOve
               完了
             </button>
             </div>
-            </div>
+              {desktop && <RepairCalendarSection repair={repair} view="summary" enabled={active}/>}
+            </>,
+            line: <MessageSection repairId={repair.id} messages={repair.tenant_messages ?? []} canUpdate={canUpdate} lineUnavailable={repair.line_messages_unavailable} attachmentsUnavailable={repair.line_attachments_unavailable} replyScope={replyScope} />,
+            files: <>
+              {(() => {
+                const photos = getDisplayPhotos(repair);
+
+                return photos.length > 0 ? (
+                  <section className="mt-4">
+                    <p className="mb-2 text-sm font-bold text-gray-700">写真</p>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-2">
+                      {photos.map((photo, index) => (
+                        <button
+                          key={`${photo.sort_order}-${photo.photo_url}`}
+                          type="button"
+                          onClick={() => openPhoto(repair.id, index)}
+                          className="overflow-hidden rounded-lg border bg-white text-left shadow-sm"
+                        >
+                          <RepairImage
+                            src={photo.photo_url}
+                            alt={`修理写真 ${index + 1}`}
+                            className="aspect-square w-full object-cover"
+                          />
+                          <span className="block px-2 py-1.5 text-xs text-gray-600">
+                            写真 {index + 1}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                ) : null;
+              })()}
+              <RepairPdfButton repairId={repair.id}/>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{repair.tenant_messages?.filter(item => item.attachment).map(item =>
+                <div key={item.id} className={`min-w-0 rounded border p-2 ${item.attachment?.outbound?'bg-[#0b2e59] text-white':'bg-slate-50'}`}>
+                  <MessageAttachment repairId={repair.id} attachment={item.attachment!}/>
+                </div>)}</div>
+            </>,
+            vendors: <VendorDispatchSection repairId={repair.id} candidates={repair.vendor_candidates ?? []}
+                dispatches={repair.vendor_dispatches ?? []} canUpdate={canUpdate}
+                unavailable={repair.vendor_dispatch_unavailable}
+                suggestedInstructions="現地確認と修理見積をお願いします。"
+                propertyName={repair.property_name} roomNumber={repair.room_number}
+                repairCategory={repair.category} repairDescription={repair.description}
+                repairPhotos={repair.repair_photos ?? []} fallbackPhotoUrl={repair.photo_url}
+                tenantMessages={repair.tenant_messages ?? []}
+                managementCompanyName="株式会社CREDO" />,
+            estimates: <>
+              {canUpdate && repair.vendor_dispatches?.filter((dispatch) =>
+                !["candidate","cancelled"].includes(dispatch.status)).map((dispatch) =>
+                <VendorQuoteUploadForm key={dispatch.id} repairId={repair.id} dispatchId={dispatch.id} />)}
+              {desktop && !canUpdate && <p className="text-sm text-slate-500">閲覧専用です。業者見積の登録はできません。</p>}
+              {desktop && canUpdate && !repair.vendor_dispatches?.some(dispatch=>!["candidate","cancelled"].includes(dispatch.status)) && <p className="text-sm text-slate-500">手配済みの業者がある場合に見積を登録できます。</p>}
+              {desktop && repair.owner_report_estimates && <EstimateSection repairId={repair.id} estimates={repair.owner_report_estimates} canUpdate={false} initialSummary={repair.description}/>}
+            </>,
+            schedule: <RepairCalendarSection repair={repair} view={desktop?"events":"all"} enabled={active}/>,
+            history: desktop?<RepairCalendarSection repair={repair} view="history" enabled={active}/>:null,
+            owner: <EstimateSection repairId={repair.id} estimates={repair.owner_report_estimates} canUpdate={canUpdate} initialSummary={repair.description} />,
+          }}/>
           )} />
 
         

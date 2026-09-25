@@ -55,6 +55,17 @@ test('timeline merges existing JST history and calendar, with actual status upda
  assert.equal(entries.at(-1).text,'日時不明の既存記録');
  assert.equal(helpers.repairCalendarTimeline(null,[event]).length,1);
 });
+
+test('workspace schedule/history tabs split the existing content and overview shows one upcoming scheduled event',()=>{
+ const future={...event,starts_at:'2099-09-25T03:00:00Z',ends_at:'2099-09-25T04:00:00Z'};
+ const events=[future,{...future,id:'later',title:'後の予定',starts_at:'2099-09-26T03:00:00Z'},
+  {...future,id:'closed',title:'完了済み',status:'completed'},{...future,id:'cancel',title:'取消済み',status:'cancelled'}];
+ const view=mode=>renderToStaticMarkup(React.createElement(Content,{repair,events,loading:false,error:false,view:mode}));
+ assert.match(view('events'),/案件の予定/);assert.doesNotMatch(view('events'),/aria-label="対応履歴"/);
+ assert.match(view('history'),/予定を完了/);assert.match(view('history'),/予定をキャンセル/);assert.doesNotMatch(view('history'),/aria-label="案件の予定"/);
+ assert.match(view('summary'),/直近の予定/);assert.match(view('summary'),/現地確認の予定/);
+ assert.doesNotMatch(view('summary'),/後の予定|完了済み|取消済み/);
+});
 test('completing a calendar event only writes calendar_events and removes it from scheduled today/tomorrow',async()=>{
  const calls=[];const original=JSON.stringify(repair);
  const supabase={from(table){calls.push(table);assert.equal(table,'calendar_events');return {update(fields){assert.deepEqual(Object.keys(fields),['status']);event.status=fields.status;return this;},eq(){return this;},select(){return this;},async maybeSingle(){return {data:{id:event.id},error:null};}};}};

@@ -86,11 +86,11 @@ export function VendorQuoteUploadForm({ repairId, dispatchId }: {repairId:number
     } catch (error) { setNotice(error instanceof Error ? error.message : "処理に失敗しました。"); }
     finally { setBusy(false); }
   }
-  return <section className="mt-4 rounded-lg border border-gray-200 bg-white p-4">
+  return <section className="@container mt-4 rounded-lg border border-gray-200 bg-white p-4">
     <h4 className="font-bold">業者見積PDF・下代明細</h4>
     <input className="mt-3 block w-full text-sm" type="file" accept="application/pdf,.pdf"
       disabled={busy || Boolean(operation?.uploaded)} onChange={(event) => changeFile(event.target.files?.[0] ?? null)} />
-    {lines.map((line,index) => <div key={index} className="mt-3 grid gap-2 md:grid-cols-5">
+    {lines.map((line,index) => <div key={index} className="mt-3 grid gap-2 @xl:grid-cols-5">
       <input aria-label={`明細${index+1} 内容`} placeholder="工事項目" value={line.description}
         onChange={(e) => setLines((all) => all.map((item,i) => i===index?{...item,description:e.target.value}:item))} />
       <input aria-label={`明細${index+1} 数量`} type="number" min="0.001" step="0.001" value={line.quantity}
