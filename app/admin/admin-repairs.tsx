@@ -13,6 +13,7 @@ import { MessageSection } from "./message-section";
 import { VendorQuoteUploadForm } from "./vendor-quote-upload-form";
 import Link from "next/link";
 import RepairList from "./repair-list";
+import RepairCalendarSection from "./repair-calendar-section";
 import { VendorDispatchSection } from "./vendor-dispatch-section";
 
 function getDisplayPhotos(repair: {
@@ -164,14 +165,7 @@ export default function AdminRepairs({ repairs, canUpdate, children, replyScope 
               {canUpdate && repair.vendor_dispatches?.filter((dispatch) =>
                 !["candidate","cancelled"].includes(dispatch.status)).map((dispatch) =>
                 <VendorQuoteUploadForm key={dispatch.id} repairId={repair.id} dispatchId={dispatch.id} />)}
-               {repair.history && (
-                <div className="mt-2 rounded bg-gray-100 p-3 text-sm">
-                <p className="font-bold">📅 対応履歴</p>
-                <pre className="whitespace-pre-wrap">
-                  {repair.history}
-                </pre>
-                </div>
-               )}
+              <RepairCalendarSection repair={repair} />
 
               <textarea
                 readOnly={!canUpdate}
