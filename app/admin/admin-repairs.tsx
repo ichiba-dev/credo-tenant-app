@@ -14,6 +14,7 @@ import { VendorQuoteUploadForm } from "./vendor-quote-upload-form";
 import Link from "next/link";
 import RepairList from "./repair-list";
 import RepairDetailTabs from "./repair-detail-tabs";
+import RepairOverview from "./repair-overview";
 import MessageAttachment from "./message-attachment";
 import { repairListState } from "./repair-list-state";
 import RepairCalendarSection from "./repair-calendar-section";
@@ -136,8 +137,9 @@ export default function AdminRepairs({ repairs, canUpdate, children, calendarOve
               <p className="mt-2 font-bold">
                ステータス：{repair.status}
                </p>
-              <p className="mt-2 text-sm text-slate-600">次にやること：{repairListState(repair).reasons.join(' / ')||'追加の要対応なし'}</p>
+              <p className={desktop?"hidden":"mt-2 text-sm text-slate-600"}>次にやること：{repairListState(repair).reasons.join(' / ')||'追加の要対応なし'}</p>
               <p className="text-xs text-slate-500">最終更新（確認可能分）：{repairListState(repair).updatedAt > 0 ? new Date(repairListState(repair).updatedAt).toLocaleString('ja-JP', {timeZone:'Asia/Tokyo'}) : '日時不明'}</p>
+              {desktop && <RepairOverview repair={repair} active={active}/>}
               <textarea
                 readOnly={!canUpdate}
                 className="mt-4 w-full rounded border p-2"
@@ -184,7 +186,6 @@ export default function AdminRepairs({ repairs, canUpdate, children, calendarOve
               完了
             </button>
             </div>
-              {desktop && <RepairCalendarSection repair={repair} view="summary" enabled={active}/>}
             </>,
             line: <MessageSection repairId={repair.id} messages={repair.tenant_messages ?? []} canUpdate={canUpdate} lineUnavailable={repair.line_messages_unavailable} attachmentsUnavailable={repair.line_attachments_unavailable} replyScope={replyScope} />,
             files: <>

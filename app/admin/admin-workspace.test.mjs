@@ -148,6 +148,7 @@ test('all eight tabs switch accessibly, retain visited forms, and reset to overv
  const sections=Object.fromEntries(DETAIL_TABS.map(([key])=>[key,React.createElement('input',{defaultValue:key})]));
  const render=(active=true,desktop=true)=>{h.reset();return Tabs({repairId:1,active,desktop,sections});};
  let tree=render();assert.equal(nodes(tree).filter(n=>n.props?.role==='tab').length,8);
+ tree.props.value('vendors');tree=render();assert.equal(nodes(tree).find(n=>n.props?.id==='repair-1-tab-vendors').props['aria-selected'],true);
  const click=key=>nodes(tree).find(n=>n.props?.id===`repair-1-tab-${key}`).props.onClick();
  for(const [key] of DETAIL_TABS) {
   click(key);tree=render();assert.equal(nodes(tree).find(n=>n.props?.id===`repair-1-panel-${key}`).props.hidden,false);
@@ -180,7 +181,7 @@ test('embedded week reuses day grouping and event list, changes day and omits em
 test('detail slots reuse LINE, dispatch, quotes, photos, calendar, timeline and owner UI with original permissions',()=>{
  const h=harness();const Stub=()=>null,Tabs=()=>null,List=()=>null;
  const imports={'react':h.hooks,'react/jsx-runtime':jsx,'next/navigation':{useRouter:()=>({refresh(){}})},
-  './admin-workspace.module.css':{default:{workspace:'workspace'}},'./actions':{},'./photo-actions':{},'./repair-pdf-button':{default:Stub},'@/app/components/repair-image':{default:Stub},
+  './admin-workspace.module.css':{default:{workspace:'workspace'}},'./repair-overview':{default:Stub},'./actions':{},'./photo-actions':{},'./repair-pdf-button':{default:Stub},'@/app/components/repair-image':{default:Stub},
   './estimate-section':{default:Stub},'./message-section':{MessageSection:Stub},'./vendor-quote-upload-form':{VendorQuoteUploadForm:Stub},
   './vendor-dispatch-section':{VendorDispatchSection:Stub},'./repair-calendar-section':{default:Stub},'./repair-list':{default:List},
   './repair-list-state':helper,'./repair-detail-tabs':{default:Tabs},'./message-attachment':{default:Stub},'next/link':{default:Stub}};
@@ -190,6 +191,8 @@ test('detail slots reuse LINE, dispatch, quotes, photos, calendar, timeline and 
   const render=nodes(tree).find(n=>n.type===List).props.renderDetail;
   const detail=render({...repair,vendor_dispatches:[{id:'d',status:'dispatched',events:[],messages:[]}],owner_report_estimates:{files:[]}},true,true);
   assert.equal(detail.type,Tabs);const s=detail.props.sections;
+  assert.ok(nodes(s.overview).some(n=>n.props?.active===true&&n.props?.repair?.id===1));
+  assert.ok(!nodes(render(repair,false,true).props.sections.overview).some(n=>n.props?.active!==undefined));
   assert.equal(s.line.props.canUpdate,canUpdate);assert.equal(s.line.props.replyScope,'scope');
   assert.equal(s.vendors.props.canUpdate,canUpdate);assert.equal(s.owner.props.canUpdate,canUpdate);
   assert.equal(s.schedule.props.view,'events');assert.equal(s.history.props.view,'history');

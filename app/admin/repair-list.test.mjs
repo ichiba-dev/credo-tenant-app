@@ -190,7 +190,7 @@ test('repair row still mounts the existing detail only after opening',()=>{
 test('admin composition widens the container and preserves viewer restrictions and detail components',()=>{
  const Stub=()=>null;
  const Admin=load('./admin-repairs.tsx',{'react':React,'react/jsx-runtime':jsx,'next/navigation':{useRouter:()=>({refresh(){}})},
-  './repair-detail-tabs':{default:Stub},'./message-attachment':{default:Stub},'./repair-list-state':helper,'./admin-workspace.module.css':{default:{workspace:'workspace'}},'./actions':{},'./photo-actions':{},'./repair-pdf-button':{default:Stub},'@/app/components/repair-image':{default:Stub},
+  './repair-detail-tabs':{default:Stub},'./message-attachment':{default:Stub},'./repair-list-state':helper,'./admin-workspace.module.css':{default:{workspace:'workspace'}},'./repair-overview':{default:Stub},'./actions':{},'./photo-actions':{},'./repair-pdf-button':{default:Stub},'@/app/components/repair-image':{default:Stub},
   './estimate-section':{default:Stub},'./message-section':{MessageSection:Stub},'./vendor-quote-upload-form':{VendorQuoteUploadForm:Stub},
   './vendor-dispatch-section':{VendorDispatchSection:Stub},'./repair-calendar-section':{default:Stub},'./repair-list':{default:List},
   'next/link':{default:({children,...props})=>React.createElement('a',props,children)}}).default;

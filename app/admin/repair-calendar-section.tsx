@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { readRepairCalendar } from "./repair-calendar-actions";
 import { repairCalendarEvents, repairCalendarLink, repairCalendarTimeline, calendarStatus, type RepairCalendarEvent } from "./repair-calendar-state";
 import { japanDay } from "./calendar-state";
@@ -39,7 +39,7 @@ export function RepairCalendarContent({repair,events,loading,error,view='all'}: 
   </>;
 }
 
-export default function RepairCalendarSection({repair,view='all',enabled=true}: {repair:AdminRepair;view?:'all'|'events'|'history'|'summary';enabled?:boolean}) {
+export default function RepairCalendarSection({repair,view='all',enabled=true,children}: {repair:AdminRepair;view?:'all'|'events'|'history'|'summary';enabled?:boolean;children?:(state:{events:RepairCalendarEvent[];loading:boolean;error:boolean})=>ReactNode}) {
   const root=useRef<HTMLDivElement>(null);
   const [state,setState]=useState<{events:RepairCalendarEvent[];loading:boolean;error:boolean}>({events:[],loading:true,error:false});
   useEffect(()=>{
@@ -55,5 +55,5 @@ export default function RepairCalendarSection({repair,view='all',enabled=true}: 
     void refresh();detail?.addEventListener('toggle',reopen);window.addEventListener('focus',reopen);
     return()=>{active=false;detail?.removeEventListener('toggle',reopen);window.removeEventListener('focus',reopen);};
   },[repair,enabled]);
-  return <div ref={root}><RepairCalendarContent repair={repair} {...state} view={view}/></div>;
+  return <div ref={root}>{children?children(state):<RepairCalendarContent repair={repair} {...state} view={view}/>}</div>;
 }

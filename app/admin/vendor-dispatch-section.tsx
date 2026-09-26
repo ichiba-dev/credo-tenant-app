@@ -7,7 +7,7 @@ import { confirmManualVendorDispatch, selectRepairVendor } from "./vendor-dispat
 import type { RepairPhoto, TenantRepairMessage, VendorCandidate, VendorDispatchHistory } from "./types";
 import { managementRequest, manualMessageDraft, tenantLineTextMessages, uniqueDispatchPhotos, updateDraftPhotoCount } from "./vendor-dispatch-compose";
 
-const statusLabels: Record<string, string> = {
+export const statusLabels: Record<string, string> = {
   candidate: "手配候補",
   dispatched: "依頼済み",
   acknowledged: "業者確認済み",
