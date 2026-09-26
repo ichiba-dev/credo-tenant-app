@@ -15,7 +15,10 @@ export function RepairOverviewContent({repair,events,loading,error,now}: {
   repair:AdminRepair;events:RepairCalendarEvent[];loading:boolean;error:boolean;now:number;
 }) {
   const jump=useContext(RepairTabContext);
-  const action=repairTodos([repair],now)[0]?.primary.action??repairListState(repair).reasons.join(' / ');
+  const primary=repairTodos([repair],now)[0]?.primary;
+  const hasAction=primary&&primary.action!==primary.label;
+  const summary=primary?.action??repairListState(repair).reasons.map(reason=>reason==='依頼済み'?'業者へ依頼済み':reason).join(' / ');
+  const latestEstimate=[...(repair.owner_report_estimates?.files??[])].sort((a,b)=>stamp(b.created_at)-stamp(a.created_at))[0];
   const items=repairCalendarEvents(events,repair.id);
   const upcoming=items.filter(event=>event.status==='scheduled'&&stamp(event.starts_at)>=now).slice(0,2);
   const dispatch=[...(repair.vendor_dispatches??[])].sort((a,b)=>stamp(b.selectedAt)-stamp(a.selectedAt))[0];
@@ -24,8 +27,8 @@ export function RepairOverviewContent({repair,events,loading,error,now}: {
   const link='mt-3 text-xs font-semibold text-[#0b2e59] underline';
   return <div data-overview-dashboard className="@container my-5 space-y-5 text-sm">
     <section className="rounded-lg bg-blue-50 p-4">
-      <h3 className="text-xs font-semibold text-slate-600">次にやること</h3>
-      <p className="mt-2 text-lg font-bold text-[#0b2e59]">{action}</p>
+      <h3 className="text-xs font-semibold text-slate-600">{hasAction?'次にやること':'現在の状況'}</h3>
+      <p className="mt-2 text-lg font-bold text-[#0b2e59]">{summary}</p>
     </section>
     <div className="grid gap-5 @lg:grid-cols-2">
       <section aria-label="直近予定">
@@ -55,9 +58,12 @@ export function RepairOverviewContent({repair,events,loading,error,now}: {
         </li>)}</ul>:<p className="mt-2 text-slate-500">表示できる入居者連絡はありません。</p>}
         <button type="button" className={link} onClick={()=>jump('line')}>入居者LINEタブを開く</button>
       </section>
-      <section aria-label="見積へのリンク">
+      {latestEstimate&&<section aria-label="最新見積">
+        <h3 className="font-bold text-[#0b2e59]">最新見積</h3>
+        <p className="mt-2 break-words font-medium">{latestEstimate.original_filename}</p>
+        <p className="mt-1 text-xs text-slate-500">登録日時：{date(latestEstimate.created_at)}</p>
         <button type="button" className={link} onClick={()=>jump('estimates')}>見積タブを開く</button>
-      </section>
+      </section>}
     </div>
     <section aria-label="最近の動き" className="border-t border-slate-100 pt-4">
       <h3 className="font-bold text-[#0b2e59]">最近の動き</h3>

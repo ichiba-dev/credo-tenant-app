@@ -25,15 +25,37 @@ const repair={id:1,status:'受付',created_at:'2026-09-25T00:00:00Z',history:nul
 const event={id:'a',repair_request_id:1,title:'未来予定',event_type:'repair_work',status:'scheduled',starts_at:'2026-09-28T01:00:00Z',ends_at:'2026-09-28T02:30:00Z',updated_at:'2026-09-25T00:00:00Z'};
 const render=(extra={})=>renderToStaticMarkup(React.createElement(Content,{repair,events:[],loading:false,error:false,now,...extra}));
 test('overview reuses todo action, empty states and uncertain-data warnings without invented quotes',()=>{
- const html=render();for(const label of ['次にやること','業者未手配','今後の予定はありません','表示できる入居者連絡はありません'])assert.ok(html.includes(label));
- assert.doesNotMatch(html,/最新見積|円/);
+ const html=render();for(const label of ['現在の状況','業者未手配','今後の予定はありません','表示できる入居者連絡はありません'])assert.ok(html.includes(label));
+ assert.doesNotMatch(html,/次にやること|最新見積|見積タブを開く|円/);
  const r={...repair,vendor_dispatches:[{id:'d',status:'candidate',events:[],messages:[]}]};
  assert.ok(render({repair:r}).includes(todo.repairTodos([r],now)[0].primary.action));
  assert.match(render({repair:{...repair,vendor_dispatch_unavailable:true}}),/手配情報を取得できていません/);
  assert.match(render({error:true}),/予定を取得できませんでした/);assert.doesNotMatch(render({error:true}),/今後の予定はありません/);
  assert.match(render({loading:true}),/予定を確認中/);
- // Owner estimate files do not establish a vendor quote's amount or receipt date.
- assert.doesNotMatch(render({repair:{...repair,owner_report_estimates:{files:[{created_at:'2026-09-25',original_filename:'owner.pdf'}]}}}),/最新見積|owner.pdf|円/);
+});
+test('status-only helper values use current situation and only explicit actions use next action',()=>{
+ const dispatched={id:'d',status:'dispatched',events:[],messages:[]};
+ for(const [extra,label] of [
+  [{vendor_dispatches:[dispatched]},'業者へ依頼済み'],
+  [{vendor_dispatches:[dispatched],status:'見積待ち'},'見積待ち'],
+  [{created_at:'2026-09-20',vendor_dispatches:[dispatched]},'3日以上更新なし'],
+  [{status:'完了'},'完了'],
+  [{vendor_dispatch_unavailable:true},'手配情報未確認'],
+ ]) {
+  const html=render({repair:{...repair,...extra}}).split('aria-label="直近予定"')[0];
+  assert.match(html,/現在の状況/);assert.ok(html.includes(label));assert.doesNotMatch(html,/次にやること/);
+ }
+ const html=render({repair:{...repair,vendor_dispatches:[{...dispatched,status:'candidate'}]}}).split('aria-label="直近予定"')[0];
+ assert.match(html,/次にやること/);assert.match(html,/業者を手配してください/);assert.doesNotMatch(html,/現在の状況/);
+});
+test('estimate block and tab link require files and show only the latest registered file metadata',()=>{
+ for(const estimates of [null,{files:[]},{files:[],unavailable:true}]) {
+  assert.doesNotMatch(render({repair:{...repair,owner_report_estimates:estimates}}),/最新見積|見積タブを開く|見積へのリンク/);
+ }
+ const files=[{created_at:'2026-09-24',original_filename:'old.pdf'},{created_at:'2026-09-25',original_filename:'latest.pdf'}];
+ const html=render({repair:{...repair,owner_report_estimates:{files}}});
+ assert.match(html,/最新見積/);assert.match(html,/latest.pdf/);assert.match(html,/登録日時：9\/25/);assert.match(html,/見積タブを開く/);
+ assert.doesNotMatch(html,/old.pdf|円|受領日時/);assert.equal(files[0].original_filename,'old.pdf');
 });
 test('upcoming schedule includes only this case future scheduled events, max two with calendar links',()=>{
  const events=[event,{...event,id:'b',title:'予定2',starts_at:'2026-09-29T01:00:00Z'},
@@ -71,6 +93,10 @@ test('overview links only switch tabs, no mutation controls even for viewer',()=
  const nodes=n=>!n||typeof n!=='object'?[]:Array.isArray(n)?n.flatMap(nodes):[n,...nodes(n.props?.children)];
  const tree=Component({repair,events:[],loading:false,error:false,now});
  for(const button of nodes(tree).filter(n=>n.type==='button'))button.props.onClick();
+ assert.deepEqual(calls,['schedule','vendors','line','history']);
+ calls.length=0;
+ const withEstimate=Component({repair:{...repair,owner_report_estimates:{files:[{created_at:'2026-09-25',original_filename:'estimate.pdf'}]}},events:[],loading:false,error:false,now});
+ for(const button of nodes(withEstimate).filter(n=>n.type==='button'))button.props.onClick();
  assert.deepEqual(calls,['schedule','vendors','line','estimates','history']);
  assert.doesNotMatch(renderToStaticMarkup(tree),/<form|<input|<textarea|ステータスを更新/);
 });
