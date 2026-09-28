@@ -2,8 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 
-import { createAuthServerClient } from "@/lib/supabase-auth/server";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { getOwnerPortalContext, ownerContextMessage } from './auth-context';
 import { getOwnerRepairList } from "./data";
 
 const decisionLabels: Record<string, string> = {
@@ -24,20 +23,13 @@ function formatDate(value: string) {
 
 export default async function OwnerRepairsPage() {
   await connection();
-  const auth = await createAuthServerClient();
-  const { data: { user }, error: authError } = await auth.auth.getUser();
-  if (authError || !user) redirect("/owner/login?next=%2Fowner");
-
-  const service = createServerSupabaseClient();
-  const { data: owner, error: ownerError } = await service
-    .from("owners")
-    .select("id, name")
-    .eq("auth_user_id", user.id)
-    .maybeSingle();
-  if (ownerError) {
-    return <main className="p-6"><p role="alert">修理案件を取得できませんでした。時間をおいて再読み込みしてください。</p></main>;
+  const context = await getOwnerPortalContext();
+  if (context.status === 'unauthenticated') redirect("/owner/login?next=%2Fowner");
+  if (context.status !== 'valid') {
+    return <main className="p-6"><p role="alert">{ownerContextMessage(context.status)}</p>
+      <a href="/owner/login?next=%2Fowner" className="mt-4 block underline">ログイン画面へ</a></main>;
   }
-  if (!owner) redirect("/owner/login?next=%2Fowner");
+  const { owner } = context;
 
   let repairs;
   try {

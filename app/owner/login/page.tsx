@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { LoginForm } from "./login-form";
-import { createAuthServerClient } from "@/lib/supabase-auth/server";
+import { getOwnerPortalContext, ownerContextMessage } from '../auth-context';
 import { ownerRepairPath } from "@/lib/repair-id";
 
 export default async function OwnerLoginPage({
@@ -11,10 +11,9 @@ export default async function OwnerLoginPage({
 }) {
   const { passwordReset, next } = await searchParams;
   const nextPath = ownerRepairPath(next);
-  const supabase = await createAuthServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const context = await getOwnerPortalContext();
 
-  if (user) {
+  if (context.status === 'valid') {
     redirect(nextPath);
   }
 
@@ -35,6 +34,11 @@ export default async function OwnerLoginPage({
           </p>
         </header>
         <div className="px-6 pb-8 pt-1 sm:px-8">
+          {(context.status === 'forbidden' || context.status === 'unavailable') && (
+            <p role="alert" className="mt-6 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800">
+              {ownerContextMessage(context.status)}
+            </p>
+          )}
           {passwordReset === "success" && (
             <p role="status" className="mt-6 rounded-xl bg-green-50 px-4 py-3 text-sm text-green-800">
               パスワードを更新しました。新しいパスワードでログインしてください。
