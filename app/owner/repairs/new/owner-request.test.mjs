@@ -116,3 +116,45 @@ test('owner form offers scoped properties and common-area option without tenant/
   for(const label of ['Building A','共用部','修理カテゴリ','内容','写真','連絡事項'])assert.ok(html.includes(label));
   assert.doesNotMatch(html,/name="(?:organization_id|owner_id|tenantName|source_type)"/);
 });
+
+const elements=node=>!node||typeof node!=='object'?[]:Array.isArray(node)?node.flatMap(elements):[node,...elements(node.props?.children)];
+function assertOwnerReturn(tree){
+  const links=elements(tree).filter(node=>node.type==='a'&&node.props.href==='/owner');
+  assert.equal(links.length,1);
+  assert.equal(links[0].props.children,'オーナー管理画面へ戻る');
+  assert.equal(links[0].props.onClick,undefined,'native navigation must not be intercepted');
+  assert.equal(links[0].props.target,undefined,'return in the same browser tab');
+  assert.equal(links[0].props.hidden,undefined);
+}
+test('intake, no-property and error pages return to the existing owner route without a client router',async()=>{
+  for(const state of ['ready','empty','error']){
+    const Page=load('./page.tsx',{
+      'react/jsx-runtime':jsx,'next/server':{connection:async()=>{}},
+      'next/navigation':{redirect:()=>{throw Error('unexpected redirect');}},
+      './data':{getOwnerRequestContext:async()=>({owner}),getOwnerRequestProperties:async()=>{
+        if(state==='error')throw Error('unavailable');
+        return state==='empty'?[]:[{id:propertyId,name:'Building A'}];
+      }},'./request-form':{default:()=>null},
+    }).default;
+    assertOwnerReturn(await Page());
+  }
+});
+test('completed intake returns with native navigation even while the form submission lock remains set',()=>{
+  let stateIndex=0;
+  const Form=load('./request-form.tsx',{
+    'react':{useRef:()=>({current:true}),useState:()=>[['room',false,'受付済み',true][stateIndex++],()=>{}]},
+    'react/jsx-runtime':jsx,'@/app/repair/upload-limits':limits,
+  }).default;
+  assertOwnerReturn(Form({properties:[]}));
+});
+test('intake still redirects an unauthenticated owner to login with its original return path',async()=>{
+  const redirects=[];
+  const Page=load('./page.tsx',{
+    'react/jsx-runtime':jsx,'next/server':{connection:async()=>{}},
+    'next/navigation':{redirect:path=>{redirects.push(path);throw Error('LOGIN_REDIRECT');}},
+    './data':{getOwnerRequestContext:async()=>{throw Error('OWNER_UNAUTHENTICATED');},getOwnerRequestProperties:async()=>{throw Error('must not run');}},
+    './request-form':{default:()=>null},
+  },{Error}).default;
+  await assert.rejects(Page(),/LOGIN_REDIRECT/);
+  assert.deepEqual(redirects,['/owner/login?next=%2Fowner%2Frepairs%2Fnew']);
+});

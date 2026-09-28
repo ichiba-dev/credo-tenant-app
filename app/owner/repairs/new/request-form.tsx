@@ -1,6 +1,5 @@
 'use client';
 import { useRef, useState } from 'react';
-import Link from 'next/link';
 import { MAX_PHOTOS, MAX_PHOTO_BYTES, MAX_TOTAL_PHOTO_BYTES, PHOTO_TYPES } from '@/app/repair/upload-limits';
 
 export default function OwnerRepairForm({ properties }: { properties: { id: string; name: string }[] }) {
@@ -31,7 +30,7 @@ export default function OwnerRepairForm({ properties }: { properties: { id: stri
     } catch { setMessage('送信結果を確認できませんでした。再送前に管理会社へお問い合わせください。'); }
     finally { setBusy(false); }
   }
-  if (finished) return <div className="mt-6"><p role="status">{message}</p><Link className="mt-4 block underline" href="/owner">オーナー画面へ戻る</Link></div>;
+  if (finished) return <div className="mt-6"><p role="status">{message}</p><a className="mt-4 block underline" href="/owner">オーナー管理画面へ戻る</a></div>;
   return <form onSubmit={submit} className="mt-6 space-y-5">
     <fieldset disabled={busy || locked.current} className="space-y-5 disabled:opacity-60">
       <label className="block">物件<select name="propertyId" required className={inputStyle}>{properties.map(property => <option key={property.id} value={property.id}>{property.name}</option>)}</select></label>
