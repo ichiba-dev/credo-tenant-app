@@ -20,6 +20,7 @@ import { repairListState } from "./repair-list-state";
 import RepairCalendarSection from "./repair-calendar-section";
 import { VendorDispatchSection } from "./vendor-dispatch-section";
 import styles from "./admin-workspace.module.css";
+import { repairSourceLabel, repairReportLabel, repairLocation, repairPhotoSource } from "@/lib/repair-source";
 
 function getDisplayPhotos(repair: {
   photo_url?: string | null;
@@ -109,7 +110,7 @@ export default function AdminRepairs({ repairs, canUpdate, children, calendarOve
         </h1>
 
         <p className="mt-2 text-gray-500 xl:hidden">
-          入居者から送信された修理依頼です。
+          入居者・オーナーなどから届いた修理依頼です。
         </p>
 
         <p role="status" className="mt-3 text-sm">{isSaving ? "保存中…" : message}</p>
@@ -118,17 +119,19 @@ export default function AdminRepairs({ repairs, canUpdate, children, calendarOve
           <RepairDetailTabs repairId={repair.id} desktop={desktop} active={active} sections={{
             overview: <>
              <p className="font-bold">
-               {repair.property_name} {repair.room_number}号室
+               {repair.property_name} {repairLocation(repair)}
              </p>
 
-              <p>入居者：{repair.tenant_name}</p>
+              <p>{repairSourceLabel(repair)}：{repair.source_type === 'owner' ? repair.source_label : repair.tenant_name}</p>
 
               <p> 不具合：{repair.category}</p>
               {repair.photos_unavailable && <p role="alert" className="mt-2 text-sm text-red-600">一部の写真を取得できませんでした。再読み込みしても表示されない場合は管理者へお問い合わせください。</p>}
 
               <p className="text-gray-500">
+                {repairReportLabel(repair)}<br/>
                 {repair.description}
               </p>
+              {repair.contact_notes && <p className="mt-2 whitespace-pre-wrap text-sm">連絡事項：{repair.contact_notes}</p>}
               <p className="mt-2 text-sm text-gray-400">
                 受付日：
                 {new Date(repair.created_at).toLocaleDateString("ja-JP")}
@@ -209,7 +212,7 @@ export default function AdminRepairs({ repairs, canUpdate, children, calendarOve
                             className="aspect-square w-full object-cover"
                           />
                           <span className="block px-2 py-1.5 text-xs text-gray-600">
-                            写真 {index + 1}
+                            写真 {index + 1} · {repairPhotoSource('source_type' in photo ? photo : repair)}
                           </span>
                         </button>
                       ))}
@@ -228,6 +231,7 @@ export default function AdminRepairs({ repairs, canUpdate, children, calendarOve
                 unavailable={repair.vendor_dispatch_unavailable}
                 suggestedInstructions="現地確認と修理見積をお願いします。"
                 propertyName={repair.property_name} roomNumber={repair.room_number}
+                sourceType={repair.source_type} locationType={repair.location_type}
                 repairCategory={repair.category} repairDescription={repair.description}
                 repairPhotos={repair.repair_photos ?? []} fallbackPhotoUrl={repair.photo_url}
                 tenantMessages={repair.tenant_messages ?? []}

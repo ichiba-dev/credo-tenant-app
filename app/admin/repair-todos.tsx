@@ -1,4 +1,5 @@
 "use client";
+import { repairLocation } from '@/lib/repair-source';
 
 import { useEffect, useState } from "react";
 import type { AdminRepair } from "./types";
@@ -30,7 +31,7 @@ export default function RepairTodos({ repairs, onSelect, collapsedLimit=5 }: { r
     {visible.length === 0 ? <p className="mt-3 text-sm text-slate-600">{todos.length === 0 ? "現在、判定できるやることはありません。" : "この条件に該当する案件はありません。"}</p> :
       <ul className="mt-3 divide-y divide-slate-100">{displayed.map(todo => <li key={todo.repair.id}>
         <button type="button" onClick={() => onSelect(todo.repair.id)} className="grid w-full gap-1 rounded px-2 py-3 text-left hover:bg-slate-50 focus-visible:outline-blue-700 sm:grid-cols-[1fr_1fr_auto] xl:grid-cols-1 xl:px-1 xl:py-2">
-          <span className="min-w-0"><span className="block truncate text-sm font-semibold text-[#0b2e59]">{todo.repair.property_name || "物件名未登録"} {todo.repair.room_number ? `${todo.repair.room_number}号室` : "号室未登録"}</span><span className="text-xs text-slate-600">{todo.repair.category || "カテゴリ未登録"}</span></span>
+          <span className="min-w-0"><span className="block truncate text-sm font-semibold text-[#0b2e59]">{todo.repair.property_name || "物件名未登録"} {repairLocation(todo.repair)}</span><span className="text-xs text-slate-600">{todo.repair.category || "カテゴリ未登録"}</span></span>
           <span className="min-w-0"><span className="block truncate text-sm">{todo.repair.description || "内容未登録"}</span><span className="text-xs font-medium text-[#0b2e59]">{todo.primary.action}</span>
             {todo.primary.key !== "stale" && todo.reasons.filter(r => r.key === "stale").map(reason => <span key={reason.key} className="ml-2 inline-block rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{reason.action}</span>)}
           </span>

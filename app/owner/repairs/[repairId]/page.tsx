@@ -98,7 +98,7 @@ export default async function OwnerRepairReportPage({ params }: { params: Promis
 
   const { data: repair, error: repairError } = await supabase
     .from("repair_requests")
-    .select("id, organization_id, property_name, room_number, tenant_name, category, description, storage_path, photo_url")
+    .select("id, organization_id, property_name, room_number, tenant_name, category, description, storage_path, photo_url, location_type, source_type, source_label")
     .eq("id", repairId)
     .maybeSingle();
 
@@ -264,8 +264,8 @@ export default async function OwnerRepairReportPage({ params }: { params: Promis
           <section className="rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-sm">
             <dl>
               <DetailRow label="物件名" value={repair.property_name} />
-              <DetailRow label="号室" value={`${repair.room_number}号室`} />
-              <DetailRow label="入居者名" value={repair.tenant_name} />
+              <DetailRow label="場所" value={repair.location_type === 'common_area' ? '共用部' : `${repair.room_number ?? ''}号室`} />
+              <DetailRow label={repair.source_type === 'owner' ? 'オーナー名' : '入居者名'} value={repair.source_type === 'owner' ? repair.source_label : repair.tenant_name} />
               <DetailRow label="不具合箇所" value={repair.category} />
             </dl>
           </section>

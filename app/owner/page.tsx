@@ -55,6 +55,7 @@ export default async function OwnerRepairsPage() {
           <p className="mt-2 text-sm text-slate-300">{owner.name} 様に届いている修繕報告です。</p>
         </header>
 
+        <Link href="/owner/repairs/new" className="mt-6 block rounded-xl bg-[#0b2e59] px-5 py-3 text-center font-bold text-white">修理を依頼する</Link>
         {repairs.length === 0 ? (
           <section className="mt-6 rounded-2xl bg-white p-8 text-center shadow-sm">
             <p className="font-medium text-slate-600">現在確認が必要な修理案件はありません。</p>
@@ -67,7 +68,7 @@ export default async function OwnerRepairsPage() {
                 <article key={repair.repairId} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
-                      <p className="font-bold text-[#0b2e59]">{repair.propertyName} {repair.roomNumber}号室</p>
+                      <p className="font-bold text-[#0b2e59]">{repair.propertyName} {repair.locationType === 'common_area' ? '共用部' : `${repair.roomNumber}号室`}</p>
                       <h2 className="mt-2 text-xl font-bold text-slate-900">{repair.category}</h2>
                     </div>
                     <span className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold ${decisionStyles[decision] ?? "bg-slate-100 text-slate-700"}`}>

@@ -8,7 +8,11 @@ const exports = {};
 const source = ts.transpileModule(readFileSync(new URL("./vendor-dispatch-compose.ts", import.meta.url), "utf8"), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText;
-vm.runInNewContext(source, { exports });
+const sourceLabels = {};
+vm.runInNewContext(ts.transpileModule(readFileSync(new URL('../../lib/repair-source.ts',import.meta.url),'utf8'), {
+  compilerOptions: { module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022 },
+}).outputText,{exports:sourceLabels});
+vm.runInNewContext(source, { exports, require: name => { assert.equal(name,'@/lib/repair-source'); return sourceLabels; } });
 const { managementRequest, manualMessageDraft, tenantLineTextMessages, uniqueDispatchPhotos, updateDraftPhotoCount } = exports;
 
 const input = { vendorName: "設備会社", contactName: "山田", propertyName: "イリスアール",
@@ -21,6 +25,11 @@ test("tenant report and company instructions stay in separate labeled blocks", (
   assert.match(body, /【管理会社からの依頼】\n見積をお願いします/);
   assert.ok(body.indexOf("【入居者申告】") < body.indexOf("【管理会社からの依頼】"));
   assert.match(body, /手動送信時に使用する写真：2枚/);
+});
+test('owner common-area report retains management instructions and never invents a room or tenant report',()=>{
+ const body=manualMessageDraft({...input,sourceType:'owner',locationType:'common_area',roomNumber:''});
+ assert.match(body,/【オーナー申告】\n冷えません/);assert.match(body,/場所：共用部/);
+ assert.match(body,/【管理会社からの依頼】\n見積をお願いします/);assert.doesNotMatch(body,/入居者申告|号室/);
 });
 
 test("empty report is omitted and selected additional tenant text can be inserted", () => {

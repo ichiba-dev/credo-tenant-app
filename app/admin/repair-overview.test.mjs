@@ -8,7 +8,7 @@ import * as jsx from 'react/jsx-runtime';
 import {renderToStaticMarkup} from 'react-dom/server';
 function load(file,imports={}) {
  const exports={};vm.runInNewContext(ts.transpileModule(readFileSync(new URL(file,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,
- {exports,require:name=>{if(name in imports)return imports[name];throw Error(name);}});return exports;
+ {exports,require:name=>{if(name==='@/lib/repair-source')return load('../../lib/repair-source.ts');if(name in imports)return imports[name];throw Error(name);}});return exports;
 }
 const list=load('./repair-list-state.ts');
 const todo=load('./repair-todo-state.ts',{'./repair-list-state':list});
@@ -24,6 +24,12 @@ const now=Date.parse('2026-09-26T00:00:00Z');
 const repair={id:1,status:'受付',created_at:'2026-09-25T00:00:00Z',history:null,vendor_dispatches:[],tenant_messages:[],owner_report_estimates:null};
 const event={id:'a',repair_request_id:1,title:'未来予定',event_type:'repair_work',status:'scheduled',starts_at:'2026-09-28T01:00:00Z',ends_at:'2026-09-28T02:30:00Z',updated_at:'2026-09-25T00:00:00Z'};
 const render=(extra={})=>renderToStaticMarkup(React.createElement(Content,{repair,events:[],loading:false,error:false,now,...extra}));
+test('overview identifies owner source while retaining shared todo status and tenant default',()=>{
+ const owner={...repair,source_type:'owner',source_channel:'web',location_type:'common_area',tenant_name:'',room_number:''};
+ const html=render({repair:owner});assert.match(html,/受付元：.*オーナー/);assert.match(html,/業者未手配/);
+ assert.match(render(),/受付元：.*入居者/);
+ assert.equal(todo.repairTodos([owner],now)[0].primary.key,todo.repairTodos([repair],now)[0].primary.key);
+});
 test('overview reuses todo action, empty states and uncertain-data warnings without invented quotes',()=>{
  const html=render();for(const label of ['現在の状況','業者未手配','今後の予定はありません','表示できる入居者連絡はありません'])assert.ok(html.includes(label));
  assert.doesNotMatch(html,/次にやること|最新見積|見積タブを開く|円/);

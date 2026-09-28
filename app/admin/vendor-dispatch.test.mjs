@@ -27,7 +27,7 @@ function load(path, imports = {}) {
 const validation = load("../../lib/vendor-dispatch.ts");
 
 function setup({ role = "admin", authenticated = true, repairOrg = "org-a", vendorOrg = "org-a",
-  active = true, existingDispatches = [] } = {}) {
+  active = true, existingDispatches = [], repairSource = 'tenant' } = {}) {
   const rpcCalls = [];
   const refreshed = [];
   const saved = new Map();
@@ -40,7 +40,7 @@ function setup({ role = "admin", authenticated = true, repairOrg = "org-a", vend
         order() { return query; }, limit() { return query; },
         async maybeSingle() {
           if (table === "repair_requests") return { data: repairOrg === null ? null :
-            { id: repairId, organization_id: repairOrg }, error: null };
+            { id: repairId, organization_id: repairOrg, source_type: repairSource, tenant_account_id: repairSource === 'owner' ? null : 'tenant-a' }, error: null };
           if (table === "repair_vendors") {
             const requested = filters.find(([field]) => field === "id")?.[1];
             return { data: vendorOrg === null || !active ? null :
@@ -85,6 +85,12 @@ test("instructions validation accepts multiline 5000 characters and rejects blan
   assert.equal(validation.parseSelectVendorInput({ ...base, instructions: "あ".repeat(5000) }).instructions.length, 5000);
   assert.equal(validation.parseSelectVendorInput({ ...base, instructions: "   " }), null);
   assert.equal(validation.parseSelectVendorInput({ ...base, instructions: "あ".repeat(5001) }), null);
+});
+test('owner repair without tenant account uses unchanged vendor selection; viewer still cannot dispatch',async()=>{
+ for(const role of ['admin','manager','staff','viewer']){
+  const s=setup({role,repairSource:'owner'});assert.equal((await s.selectRepairVendor(base)).ok,role!=='viewer');
+  assert.equal(s.rpcCalls.length,role==='viewer'?0:1);
+ }
 });
 
 for (const role of ["admin", "manager", "staff"]) test(`${role} can select a scoped active vendor`, async () => {
@@ -354,7 +360,7 @@ test("manual delivery history is returned with its staff actor", async () => {
       recipient_address: "090-0000-0000", sent_by: "user-a", sent_at: "2026-09-21T07:30:00Z",
       delivery_status: "manual_confirmed", photo_selection_recorded: true }],
     repair_vendor_dispatch_message_attachments: [
-      { id: "photo-a", organization_id: "org-a", message_id: "message-a", source_type: "repair_photo", sort_order: 0 },
+      { id: "photo-a", organization_id: "org-a", message_id: "message-a", source_type: "repair_photo", repair_photo_id: "9223372036854775807", sort_order: 0 },
       { id: "photo-b", organization_id: "org-a", message_id: "message-a", source_type: "tenant_line_attachment", sort_order: 1 },
     ],
   });
@@ -362,6 +368,7 @@ test("manual delivery history is returned with its staff actor", async () => {
   assert.equal(result.byRepair[repairId][0].messages.length, 1);
   assert.equal(result.byRepair[repairId][0].messages[0].deliveryStatus, "manual_confirmed");
   assert.equal(result.byRepair[repairId][0].messages[0].sentByName, "市場");
+  assert.equal(result.byRepair[repairId][0].messages[0].attachments[0].repairPhotoId,"9223372036854775807");
   assert.equal(result.byRepair[repairId][0].messages[0].photoSelectionRecorded, true);
   assert.deepEqual(JSON.parse(JSON.stringify(result.byRepair[repairId][0].messages[0].attachments.map((photo) => photo.sourceType))),
     ["repair_photo", "tenant_line_attachment"]);

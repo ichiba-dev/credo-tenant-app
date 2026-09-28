@@ -1,4 +1,5 @@
 "use client";
+import { repairSourceLabel, repairLocation } from '@/lib/repair-source';
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import RepairTodos from "./repair-todos";
@@ -121,7 +122,7 @@ export default function RepairList({repairs, renderDetail, calendarOverview, cal
                     onClick={event=>{if(desktop){event.preventDefault();setVisited(previous=>new Set(previous).add(repair.id));setSelectedId(repair.id);setJumpId(repair.id);}}}
                     className={`cursor-pointer list-none px-4 py-3 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-blue-700 ${desktop&&selectedId===repair.id?'border-l-4 border-[#0b2e59] bg-blue-50':''}`}>
                     <span className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)_auto] md:items-center xl:grid-cols-2">
-                      <span className="min-w-0"><span className="block font-bold text-[#0b2e59]">{repair.room_number || "号室未登録"}{repair.room_number && "号室"}</span><span className="block truncate text-xs text-slate-600">{repair.tenant_name || "入居者名未登録"}</span></span>
+                      <span className="min-w-0"><span className="mr-2 rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{repairSourceLabel(repair)}</span><span className="block font-bold text-[#0b2e59]">{repairLocation(repair)}</span><span className="block truncate text-xs text-slate-600">{repair.source_type === 'owner' ? repair.source_label : repair.tenant_name || "入居者名未登録"}</span></span>
                       <span className="min-w-0"><span className="block text-sm font-medium">{repair.category || "カテゴリ未登録"}</span><span className="block truncate text-xs text-slate-600">{repair.description || "内容未登録"}</span></span>
                       <span><span className="block text-xs text-slate-600">{repair.status || "ステータス未登録"}</span><span className="mt-1 flex flex-wrap gap-1">{state.reasons.map(reason => <span key={reason} className={`rounded px-2 py-0.5 text-xs ${state.attention ? "bg-amber-50 text-amber-900" : "bg-slate-100 text-slate-700"}`}>{reason}</span>)}</span></span>
                       <span className="text-xs text-slate-500"><span className="block">最終更新（確認可能分）</span>{state.updatedAt ? <time dateTime={new Date(state.updatedAt).toISOString()}>{dateFormat.format(state.updatedAt)}</time> : "日時不明"}<span className="mt-1 block text-[#0b2e59]">{desktop?'詳細を表示 →':'詳細を開閉 ↕'}</span></span>
@@ -142,10 +143,10 @@ export default function RepairList({repairs, renderDetail, calendarOverview, cal
     {!selected?<p className="p-4 text-sm text-slate-500">{repairs.length?'左の一覧から案件を選択してください。':'表示する案件はありません。'}</p>:
       <header data-case-header className="space-y-2">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <h2 className="min-w-0 break-words text-xl font-bold text-[#0b2e59]">{selected.property_name} {selected.room_number}号室</h2>
+          <h2 className="min-w-0 break-words text-xl font-bold text-[#0b2e59]">{selected.property_name} {repairLocation(selected)}</h2>
           <span className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-semibold text-[#0b2e59]">{selected.status}</span>
         </div>
-        <p className="text-sm text-slate-600">{selected.category} <span className="mx-2 text-slate-300">/</span> 入居者：{selected.tenant_name}</p>
+        <p className="text-sm text-slate-600">{selected.category} <span className="mx-2 text-slate-300">/</span> <span className="rounded bg-slate-100 px-2 py-1 text-xs">{repairSourceLabel(selected)}</span> {selected.source_type === 'owner' ? selected.source_label : selected.tenant_name}</p>
       </header>}
     {repairs.filter(repair=>visited.has(repair.id)).map(repair=><div key={repair.id} hidden={repair.id!==selectedId}>
       {renderDetail(repair,true,repair.id===selectedId)}

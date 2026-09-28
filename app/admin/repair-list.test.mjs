@@ -11,6 +11,7 @@ function load(name, imports={}) {
  vm.runInNewContext(ts.transpileModule(readFileSync(new URL(name,import.meta.url),'utf8'),
   {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,
   {exports,require:(name)=>{
+   if(name==='@/lib/repair-source')return load('../../lib/repair-source.ts');
    if(name in imports)return imports[name];
    if(name==='./repair-todo-state')return load('./repair-todo-state.ts',{'./repair-list-state':helper});
    if(name==='./repair-todos')return load('./repair-todos.tsx',{'react':React,'react/jsx-runtime':jsx});

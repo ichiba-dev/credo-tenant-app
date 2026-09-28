@@ -10,6 +10,7 @@ export function parseRepairId(value: string): number | null {
 }
 
 export function ownerRepairPath(value: unknown) {
+  if (value === "/owner/repairs/new") return value;
   if (value === "/owner") return "/owner";
   if (typeof value !== "string") return "/owner";
   const match = /^\/owner\/repairs\/([1-9][0-9]*)$/.exec(value);

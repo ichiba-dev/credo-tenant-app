@@ -6,6 +6,7 @@ import CalendarEventForm from "./calendar-event-form";
 import { confirmManualVendorDispatch, selectRepairVendor } from "./vendor-dispatch-actions";
 import type { RepairPhoto, TenantRepairMessage, VendorCandidate, VendorDispatchHistory } from "./types";
 import { managementRequest, manualMessageDraft, tenantLineTextMessages, uniqueDispatchPhotos, updateDraftPhotoCount } from "./vendor-dispatch-compose";
+import { repairPhotoSource, repairReportLabel, repairLocation } from '@/lib/repair-source';
 
 export const statusLabels: Record<string, string> = {
   candidate: "手配候補",
@@ -27,7 +28,9 @@ const formatDate = (value: string) => new Intl.DateTimeFormat("ja-JP", {
 
 export function VendorDispatchSection({ repairId, candidates, dispatches, canUpdate,
   unavailable, suggestedInstructions, propertyName, roomNumber, repairCategory,
-  repairDescription, repairPhotos, fallbackPhotoUrl, tenantMessages, managementCompanyName }: {
+  repairDescription, repairPhotos, fallbackPhotoUrl, tenantMessages, managementCompanyName, sourceType, locationType }: {
+  sourceType?: string;
+  locationType?: string;
   repairId: number;
   candidates: VendorCandidate[];
   dispatches: VendorDispatchHistory[];
@@ -66,7 +69,7 @@ export function VendorDispatchSection({ repairId, candidates, dispatches, canUpd
   const lineMessages = useMemo(() => tenantLineTextMessages(tenantMessages), [tenantMessages]);
   const photos = useMemo(() => uniqueDispatchPhotos([
     ...repairPhotos.map((photo, index) => ({ id: `repair:${photo.id ?? index}`, url: photo.photo_url,
-      source: "入居者フォーム" as const, sourceType: "repair_photo" as const,
+      source: repairPhotoSource(photo), sourceType: "repair_photo" as const,
       sourceId: photo.id, selectedByDefault: !!photo.id })),
     ...(repairPhotos.length ? [] : fallbackPhotoUrl ? [{ id: "repair:fallback", url: fallbackPhotoUrl,
       source: "不明" as const, sourceType: "legacy_photo" as const, selectedByDefault: false }] : []),
@@ -131,7 +134,7 @@ export function VendorDispatchSection({ repairId, candidates, dispatches, canUpd
     setSelectedPhotoIds(initialPhotos);
     setAddedMessageIds([]);
     setManualBody(manualMessageDraft({ vendorName: dispatch.vendorName, contactName: dispatch.vendorContactName,
-      propertyName, roomNumber, category: repairCategory, report: repairDescription,
+      propertyName, roomNumber, sourceType, locationType, category: repairCategory, report: repairDescription,
       instructions: managementRequest(dispatch.instructions, propertyName, roomNumber, repairDescription),
       managementCompanyName, additionalMessages: [],
       photoCount: initialPhotos.length }));
@@ -222,7 +225,7 @@ export function VendorDispatchSection({ repairId, candidates, dispatches, canUpd
           {item.photoSelectionRecorded ? <details className="mt-1"><summary className="cursor-pointer text-xs font-bold">
             送信対象として記録した写真：{item.attachments?.length ?? 0}枚</summary>
             <ul className="ml-4 list-disc text-xs">{item.attachments?.map((photo) => <li key={photo.id}>
-              {photo.sourceType === "repair_photo" ? "入居者フォーム" :
+              {photo.sourceType === "repair_photo" ? (photos.find(item=>item.sourceType==='repair_photo'&&item.sourceId===photo.repairPhotoId)?.source ?? '修理受付写真（出所未確認）') :
                 photo.sourceType === "tenant_line_attachment" ? "入居者LINE" : "旧写真（監査用参照）"}
             </li>)}</ul>
           </details> : <p className="text-xs">旧履歴：写真選択の記録なし</p>}
@@ -241,9 +244,9 @@ export function VendorDispatchSection({ repairId, candidates, dispatches, canUpd
         <dl className="mt-3 grid gap-2 rounded-lg bg-slate-50 p-3 text-sm sm:grid-cols-2">
           <div><dt className="text-xs font-bold text-slate-500">業者</dt><dd>{dispatch.vendorName} / {dispatch.vendorContactName}</dd></div>
           <div><dt className="text-xs font-bold text-slate-500">連絡先</dt><dd>{[dispatch.vendorPhone, dispatch.vendorEmail].filter(Boolean).join(" / ") || "未登録"}</dd></div>
-          <div><dt className="text-xs font-bold text-slate-500">物件・号室</dt><dd>{propertyName} {roomNumber}号室</dd></div>
+          <div><dt className="text-xs font-bold text-slate-500">物件・場所</dt><dd>{propertyName} {repairLocation({room_number:roomNumber,location_type:locationType})}</dd></div>
           <div><dt className="text-xs font-bold text-slate-500">修繕カテゴリ</dt><dd>{repairCategory}</dd></div>
-          {repairDescription.trim() && <div className="sm:col-span-2"><dt className="text-xs font-bold text-slate-500">【入居者申告】</dt><dd className="whitespace-pre-wrap">{repairDescription}</dd></div>}
+          {repairDescription.trim() && <div className="sm:col-span-2"><dt className="text-xs font-bold text-slate-500">{repairReportLabel({source_type:sourceType})}</dt><dd className="whitespace-pre-wrap">{repairDescription}</dd></div>}
           <div className="sm:col-span-2"><dt className="text-xs font-bold text-slate-500">【管理会社からの依頼】</dt><dd className="whitespace-pre-wrap">{managementRequest(dispatch.instructions, propertyName, roomNumber, repairDescription)}</dd></div>
           <div><dt className="text-xs font-bold text-slate-500">手動送信時に使用する写真</dt><dd>{selectedPhotoIds.length}枚</dd></div>
           <div><dt className="text-xs font-bold text-slate-500">管理会社名</dt><dd>{managementCompanyName}</dd></div>

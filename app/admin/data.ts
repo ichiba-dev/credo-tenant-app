@@ -7,7 +7,7 @@ import { PhotoUnavailableError, resolveRepairPhotoUrl } from "@/lib/repair-photo
 export async function getAdminRepairs(context: Extract<Awaited<ReturnType<typeof getStaffContext>>, { ok: true }>, repairId?: number): Promise<AdminRepair[]> {
   const { supabase, organizationId } = context;
   let query = supabase.from("repair_requests")
-    .select("id, organization_id, property_name, room_number, tenant_name, category, description, status, history, staff_comment, created_at, photo_url, storage_path")
+    .select("id, organization_id, property_name, room_number, tenant_name, category, description, status, history, staff_comment, created_at, photo_url, storage_path, source_type, source_channel, source_label, location_type, contact_notes")
     .eq("organization_id", organizationId)
     .order("created_at", { ascending: false });
   if (repairId !== undefined) query = query.eq("id", repairId);
@@ -18,7 +18,7 @@ export async function getAdminRepairs(context: Extract<Awaited<ReturnType<typeof
     throw new Error("案件の閲覧権限を確認できませんでした。");
   }
   const { data: photos, error: photoError } = await supabase.from("repair_photos")
-    .select("id::text, repair_id, organization_id, photo_url, storage_path, sort_order")
+    .select("id::text, repair_id, organization_id, photo_url, storage_path, sort_order, source_type, source_channel")
     .eq("organization_id", organizationId)
     .in("repair_id", data.map((repair) => repair.id))
     .order("sort_order", { ascending: true });
@@ -33,7 +33,7 @@ export async function getAdminRepairs(context: Extract<Awaited<ReturnType<typeof
     if (photo.storage_path || photo.photo_url) withPhotos.add(photo.repair_id);
     try {
       const url = await resolveRepairPhotoUrl(photo, organizationId, photo.repair_id);
-      if (url) (grouped[photo.repair_id] ??= []).push({ id: photo.id, repair_id: photo.repair_id, photo_url: url, sort_order: photo.sort_order });
+      if (url) (grouped[photo.repair_id] ??= []).push({ id: photo.id, repair_id: photo.repair_id, photo_url: url, sort_order: photo.sort_order, source_type: photo.source_type, source_channel: photo.source_channel });
     } catch (error) {
       if (!(error instanceof PhotoUnavailableError)) throw error;
       unavailable.add(photo.repair_id);
@@ -49,6 +49,6 @@ export async function getAdminRepairs(context: Extract<Awaited<ReturnType<typeof
         unavailable.add(repair.id);
       }
     }
-    return { ...repair, photo_url: url, repair_photos: grouped[repair.id] ?? [], photos_unavailable: unavailable.has(repair.id), owner_report_estimates: null };
+    return { ...repair, room_number: repair.room_number ?? '', tenant_name: repair.tenant_name ?? '', photo_url: url, repair_photos: grouped[repair.id] ?? [], photos_unavailable: unavailable.has(repair.id), owner_report_estimates: null };
   }));
 }

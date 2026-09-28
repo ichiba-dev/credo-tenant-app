@@ -1,7 +1,8 @@
+import { repairReportLabel, repairLocation } from '@/lib/repair-source';
 export type DispatchPhoto = {
   id: string;
   url: string;
-  source: "入居者フォーム" | "入居者LINE" | "不明";
+  source: string;
   sourceType: "repair_photo" | "tenant_line_attachment" | "legacy_photo";
   sourceId?: string;
   createdAt?: string;
@@ -35,14 +36,15 @@ export function manualMessageDraft(input: {
   vendorName: string; contactName: string; propertyName: string; roomNumber: string;
   category: string; report: string; instructions: string; managementCompanyName: string;
   additionalMessages: string[]; photoCount: number;
+  sourceType?: string; locationType?: string;
 }): string {
   const sections = [
     `${input.vendorName}\n${input.contactName}様`,
     `いつもお世話になっております。\n${input.managementCompanyName}です。`,
     "下記修繕についてご対応をお願いいたします。",
-    `物件：${input.propertyName}\n号室：${input.roomNumber}号室\n修繕カテゴリ：${input.category}`,
+    `物件：${input.propertyName}\n${input.locationType === 'common_area' ? '場所' : '号室'}：${repairLocation({ room_number: input.roomNumber, location_type: input.locationType })}\n修繕カテゴリ：${input.category}`,
   ];
-  if (input.report.trim()) sections.push(`【入居者申告】\n${input.report.trim()}`);
+  if (input.report.trim()) sections.push(`${repairReportLabel({source_type:input.sourceType})}\n${input.report.trim()}`);
   for (const message of input.additionalMessages.filter((value) => value.trim()))
     sections.push(`【入居者からの追加連絡】\n${message.trim()}`);
   sections.push(`【管理会社からの依頼】\n${input.instructions.trim()}`);

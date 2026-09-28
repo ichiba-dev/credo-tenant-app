@@ -58,6 +58,17 @@ function setup({ user = { id: "user-a" }, members = [{ organization_id: "org-a",
 }
 const ok = (data) => ({ data, error: null });
 const has = (query, filter) => query.filters.some((entry) => JSON.stringify(entry) === JSON.stringify(filter));
+test('owner repairs and photos use the existing org-scoped admin list and viewer signing path',async()=>{
+ const path='org-a/17/12345678-1234-4234-8234-123456789012.jpg';
+ const s=setup({members:[{organization_id:'org-a',role:'viewer'}],responses:[
+  ok([{id:17,source_type:'owner',source_channel:'web',source_label:'Owner A',location_type:'common_area',room_number:null,tenant_name:null}]),
+  ok([{id:'42',repair_id:17,storage_path:path,photo_url:null,sort_order:1,source_type:'owner',source_channel:'web'}]),
+ ]});
+ const result=await s.refreshRepairPhotos(17);assert.equal(result.ok,true);assert.equal(result.repair.source_type,'owner');
+ assert.equal(result.repair.room_number,'');assert.equal(result.repair.tenant_name,'');assert.equal(result.repair.repair_photos[0].source_type,'owner');
+ assert.equal(result.repair.repair_photos[0].photo_url,'signed:'+path);
+ assert.ok(has(s.queries[1],['eq','organization_id','org-a']));assert.ok(has(s.queries[2],['eq','organization_id','org-a']));
+});
 
 test("admin, manager and staff can read and update; viewer can read but cannot mutate", async () => {
   for (const role of ["admin", "manager", "staff", "viewer"]) {

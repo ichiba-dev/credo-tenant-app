@@ -8,6 +8,7 @@ import { repairTodos } from "./repair-todo-state";
 import { statusLabels } from "./vendor-dispatch-section";
 import { timeLabel } from "./calendar/scheduler";
 import type { AdminRepair } from "./types";
+import { repairSourceLabel } from "@/lib/repair-source";
 
 const stamp=(value:string|null|undefined)=>value&&Number.isFinite(Date.parse(value))?Date.parse(value):0;
 const date=(value:string)=>stamp(value)?new Date(value).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'日時不明';
@@ -26,6 +27,7 @@ export function RepairOverviewContent({repair,events,loading,error,now}: {
   const recent=repairCalendarTimeline(repair.history,items).filter(entry=>entry.at&&stamp(entry.at)<=now).reverse().slice(0,3);
   const link='mt-3 text-xs font-semibold text-[#0b2e59] underline';
   return <div data-overview-dashboard className="@container my-5 space-y-5 text-sm">
+    <p>受付元：<span className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">{repairSourceLabel(repair)}</span></p>
     <section className="rounded-lg bg-blue-50 p-4">
       <h3 className="text-xs font-semibold text-slate-600">{hasAction?'次にやること':'現在の状況'}</h3>
       <p className="mt-2 text-lg font-bold text-[#0b2e59]">{summary}</p>

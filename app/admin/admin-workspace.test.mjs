@@ -10,7 +10,7 @@ import {renderToStaticMarkup} from 'react-dom/server';
 function load(file,imports={},globals={}) {
  const exports={};vm.runInNewContext(ts.transpileModule(readFileSync(new URL(file,import.meta.url),'utf8'),
   {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,
-  {exports,require:name=>{if(name in imports)return imports[name];throw Error(name);},...globals});return exports;
+  {exports,require:name=>{if(name==='@/lib/repair-source')return load('../../lib/repair-source.ts');if(name in imports)return imports[name];throw Error(name);},...globals});return exports;
 }
 const nodes=node=>!node||typeof node!=='object'?[]:Array.isArray(node)?node.flatMap(nodes):[node,...nodes(node.props?.children)];
 const helper=load('./repair-list-state.ts');
@@ -51,6 +51,15 @@ test('desktop selects center detail, highlights row, never mounts inline, and ca
  tree=h.render();assert.deepEqual(h.calls,[{id:1,pc:true,active:false},{id:2,pc:true,active:true}]);
  assert.equal(nodes(pane()).find(n=>n.type==='div'&&n.key==='1').props.hidden,true);
  assert.equal(nodes(pane()).find(n=>n.type==='div'&&n.key==='2').props.hidden,false);
+});
+test('owner common-area case uses the same pane and list, source badges and existing todo rules',()=>{
+ const owner={...repair,source_type:'owner',source_label:'Owner A',location_type:'common_area',room_number:'',tenant_name:''};
+ const h=listHarness();let tree=h.render([owner]);
+ const html=renderToStaticMarkup(tree);assert.match(html,/オーナー/);assert.match(html,/共用部/);assert.doesNotMatch(html,/入居者名未登録|共用部号室/);
+ nodes(tree).find(n=>n.props?.id==='repair-detail-1').props.children[0].props.onClick({preventDefault(){}});
+ tree=h.render([owner]);const heading=renderToStaticMarkup(nodes(tree).find(n=>n.props?.['data-case-header']));
+ assert.match(heading,/オーナー/);assert.match(heading,/共用部/);assert.match(heading,/Owner A/);
+ assert.equal(h.calls[0].id,owner.id);assert.equal(todo.repairTodos([owner],Date.parse('2026-09-26'))[0].primary.key,'unassigned');
 });
 
 test('desktop presentation fixes side widths, keeps the center fluid and scopes styling away from mobile',()=>{
@@ -186,15 +195,20 @@ test('detail slots reuse LINE, dispatch, quotes, photos, calendar, timeline and 
   './vendor-dispatch-section':{VendorDispatchSection:Stub},'./repair-calendar-section':{default:Stub},'./repair-list':{default:List},
   './repair-list-state':helper,'./repair-detail-tabs':{default:Tabs},'./message-attachment':{default:Stub},'next/link':{default:Stub}};
  const Admin=load('./admin-repairs.tsx',imports).default;
- for(const canUpdate of [false,true]) {
+ for(const canUpdate of [false,true]) for(const sourceType of ['tenant','owner']) {
   h.reset();const tree=Admin({repairs:[repair],canUpdate,replyScope:'scope'});
   const render=nodes(tree).find(n=>n.type===List).props.renderDetail;
-  const detail=render({...repair,vendor_dispatches:[{id:'d',status:'dispatched',events:[],messages:[]}],owner_report_estimates:{files:[]}},true,true);
+  const detail=render({...repair,source_type:sourceType,source_label:'Owner A',location_type:sourceType==='owner'?'common_area':'room',vendor_dispatches:[{id:'d',status:'dispatched',events:[],messages:[]}],owner_report_estimates:{files:[]},repair_photos:[{id:'42',photo_url:'signed:owner-photo',source_type:sourceType}]},true,true);
   assert.equal(detail.type,Tabs);const s=detail.props.sections;
   assert.ok(nodes(s.overview).some(n=>n.props?.active===true&&n.props?.repair?.id===1));
   assert.ok(!nodes(render(repair,false,true).props.sections.overview).some(n=>n.props?.active!==undefined));
   assert.equal(s.line.props.canUpdate,canUpdate);assert.equal(s.line.props.replyScope,'scope');
   assert.equal(s.vendors.props.canUpdate,canUpdate);assert.equal(s.owner.props.canUpdate,canUpdate);
+  assert.equal(s.vendors.props.sourceType,sourceType);
+  if(sourceType==='owner') {
+   assert.match(renderToStaticMarkup(s.overview),/【オーナー申告】/);assert.doesNotMatch(renderToStaticMarkup(s.overview),/【入居者申告】/);
+   assert.match(renderToStaticMarkup(s.files),/オーナー/);assert.equal(s.vendors.props.locationType,'common_area');
+  }
   assert.equal(s.schedule.props.view,'events');assert.equal(s.history.props.view,'history');
   assert.equal(nodes(s.estimates).filter(n=>n.props?.dispatchId==='d').length,canUpdate?1:0);
   assert.equal(nodes(s.overview).find(n=>n.type==='textarea').props.readOnly,!canUpdate);

@@ -57,7 +57,7 @@ export async function getVendorDispatchData(context: StaffContext, repairIds: nu
   const messages = messageResult.data ?? [];
   const messageIds = messages.map((row) => row.id);
   const attachmentResult = messageIds.length ? await supabase.from("repair_vendor_dispatch_message_attachments")
-    .select("id,organization_id,message_id,source_type,sort_order")
+    .select("id,organization_id,message_id,source_type,repair_photo_id::text,sort_order")
     .eq("organization_id", organizationId).in("message_id", messageIds)
     .order("sort_order", { ascending: true }) : { data: [], error: null };
   if (attachmentResult.error) throw new Error("VENDOR_DISPATCH_ATTACHMENTS_UNAVAILABLE");
@@ -117,6 +117,7 @@ export async function getVendorDispatchData(context: StaffContext, repairIds: nu
         photoSelectionRecorded: message.photo_selection_recorded === true,
         attachments: attachments.filter((photo) => photo.message_id === message.id).map((photo) => ({
           id: photo.id, sourceType: photo.source_type as "repair_photo" | "tenant_line_attachment" | "legacy_photo",
+          repairPhotoId: photo.repair_photo_id,
           sortOrder: photo.sort_order,
         })),
       })),

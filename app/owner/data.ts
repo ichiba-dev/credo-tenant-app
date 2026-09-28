@@ -6,6 +6,7 @@ export type OwnerRepairListItem = {
   repairId: number;
   propertyName: string;
   roomNumber: string;
+  locationType?: string;
   category: string;
   description: string;
   repairCreatedAt: string;
@@ -49,7 +50,7 @@ export async function getOwnerRepairList(ownerId: string | number): Promise<Owne
 
   const [{ data: repairs, error: repairError }, { data: approvals, error: approvalError }] = await Promise.all([
     service.from("repair_requests")
-      .select("id, organization_id, property_name, room_number, category, description, created_at")
+      .select("id, organization_id, property_name, room_number, location_type, category, description, created_at")
       .in("id", repairIds),
     service.from("owner_approvals")
       .select("owner_id, owner_report_id, organization_id, decision")
@@ -75,7 +76,8 @@ export async function getOwnerRepairList(ownerId: string | number): Promise<Owne
     return {
       repairId: repair.id,
       propertyName: repair.property_name,
-      roomNumber: repair.room_number,
+      roomNumber: repair.room_number ?? '',
+      locationType: repair.location_type,
       category: repair.category,
       description: repair.description,
       repairCreatedAt: repair.created_at,
