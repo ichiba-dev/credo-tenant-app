@@ -125,6 +125,36 @@ try {
   assert.equal(sections.find((row) => row.section === "overall").all_match, true);
   await db.exec("rollback");
 
+  async function expectPostcheckFailure(change, section) {
+    await db.exec("begin");
+    try {
+      await db.exec(change);
+      const result = await db.exec(postcheck);
+      assert.equal(result.length, 1);
+      assert.equal(result[0].rows.find((row) => row.section === section).all_match, false, change);
+      assert.equal(result[0].rows.find((row) => row.section === "overall").all_match, false, change);
+    } finally {
+      await db.exec("rollback");
+    }
+  }
+  await expectPostcheckFailure("alter table owners alter column email type integer using null::integer", "owners_email");
+  await expectPostcheckFailure("alter table owner_auth_operations drop constraint owner_auth_operations_request_id_key",
+    "owner_auth_operations_constraints");
+  await expectPostcheckFailure("alter table owner_auth_operations drop constraint owner_auth_operations_owner_org_fk",
+    "owner_auth_operations_constraints");
+  await expectPostcheckFailure("grant select (requested_email) on owner_auth_operations to anon",
+    "owner_auth_operations_acl");
+  await expectPostcheckFailure("grant delete on owner_auth_operations to service_role", "owner_auth_operations_acl");
+  await expectPostcheckFailure(`drop trigger owner_auth_operations_guard_identity on owner_auth_operations;
+    create trigger owner_auth_operations_guard_identity before update on owner_auth_operations
+      for each row execute function public.guard_owner_auth_operation_identity();`, "guard_trigger");
+  await expectPostcheckFailure("alter table owner_auth_operations no force row level security", "owner_auth_operations_rls_policy");
+  await expectPostcheckFailure("alter table owner_auth_operations disable row level security", "owner_auth_operations_rls_policy");
+  await expectPostcheckFailure("drop index owner_auth_operations_org_owner_created_idx", "owner_auth_operations_index");
+  await expectPostcheckFailure("alter table owners alter column email set default 'unexpected'", "owners_email");
+  await expectPostcheckFailure("alter table owner_auth_operations alter column status drop not null",
+    "owner_auth_operations_columns");
+
   const acl = await db.query(`select
     has_table_privilege('anon','public.owner_auth_operations','SELECT') anon_select,
     has_table_privilege('authenticated','public.owner_auth_operations','UPDATE') authenticated_update,
@@ -166,21 +196,10 @@ try {
       any_delete: false, any_truncate: false, any_references: false, any_trigger: false });
   }
 
-  for (const change of [
-    "grant delete on public.owner_auth_operations to service_role",
-    "grant update on public.owner_auth_operations to service_role with grant option",
-    "grant select (requested_email) on public.owner_auth_operations to anon",
-  ]) {
-    await db.exec("begin");
-    try {
-      await db.exec(change);
-      const result = await db.exec(postcheck);
-      assert.equal(result[0].rows.find((row) => row.section === "service_role_only").all_match, false, change);
-      assert.equal(result[0].rows.find((row) => row.section === "overall").all_match, false, change);
-    } finally {
-      await db.exec("rollback");
-    }
-  }
+  await expectPostcheckFailure("grant update on public.owner_auth_operations to service_role with grant option",
+    "owner_auth_operations_acl");
+  await expectPostcheckFailure("create policy unexpected_owner_auth_policy on owner_auth_operations for select to anon",
+    "owner_auth_operations_rls_policy");
 
   const rollbackDb = new PGlite();
   try {
