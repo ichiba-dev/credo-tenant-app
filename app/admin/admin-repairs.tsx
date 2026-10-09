@@ -98,6 +98,7 @@ export default function AdminRepairs({ repairs, canUpdate, children, calendarOve
             <span className="text-sm font-semibold">修理管理</span>
           </div>
         <nav className="mb-5 flex flex-wrap justify-end gap-2">
+          <Link href="/admin/owners" className="rounded-lg bg-[#174f45] px-4 py-2 font-bold text-white shadow hover:bg-[#123d36]">オーナーAuth</Link>
           <Link href="/admin/calendar" className="rounded-lg bg-blue-950 px-4 py-2 font-bold text-white shadow hover:bg-blue-900">カレンダー</Link>
           <Link href="/admin/vendors" className="rounded-lg bg-blue-950 px-4 py-2 font-bold text-white shadow hover:bg-blue-900">業者マスタ</Link>
         </nav>
