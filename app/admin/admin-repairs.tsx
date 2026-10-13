@@ -11,6 +11,7 @@ import RepairImage from "@/app/components/repair-image";
 import EstimateSection from "./estimate-section";
 import { MessageSection } from "./message-section";
 import { VendorQuoteUploadForm } from "./vendor-quote-upload-form";
+import VendorQuoteList from './vendor-quote-list';
 import Link from "next/link";
 import RepairList from "./repair-list";
 import RepairDetailTabs from "./repair-detail-tabs";
@@ -228,6 +229,7 @@ export default function AdminRepairs({ repairs, canUpdate, children, calendarOve
                 </div>)}</div>
             </>,
             vendors: <VendorDispatchSection repairId={repair.id} candidates={repair.vendor_candidates ?? []}
+                quoteRequests={repair.vendor_quote_requests} quotesUnavailable={repair.vendor_quotes_unavailable}
                 dispatches={repair.vendor_dispatches ?? []} canUpdate={canUpdate}
                 unavailable={repair.vendor_dispatch_unavailable}
                 suggestedInstructions="現地確認と修理見積をお願いします。"
@@ -238,16 +240,15 @@ export default function AdminRepairs({ repairs, canUpdate, children, calendarOve
                 tenantMessages={repair.tenant_messages ?? []}
                 managementCompanyName="株式会社CREDO" />,
             estimates: <>
-              {canUpdate && repair.vendor_dispatches?.filter((dispatch) =>
-                !["candidate","cancelled"].includes(dispatch.status)).map((dispatch) =>
-                <VendorQuoteUploadForm key={dispatch.id} repairId={repair.id} dispatchId={dispatch.id} />)}
+              <VendorQuoteList repairId={repair.id} quotes={repair.vendor_quotes??[]} unavailable={repair.vendor_quotes_unavailable}/>
+              {canUpdate && <VendorQuoteUploadForm repairId={repair.id} dispatches={repair.vendor_dispatches ?? []} />}
               {desktop && !canUpdate && <p className="text-sm text-slate-500">閲覧専用です。業者見積の登録はできません。</p>}
               {desktop && canUpdate && !repair.vendor_dispatches?.some(dispatch=>!["candidate","cancelled"].includes(dispatch.status)) && <p className="text-sm text-slate-500">手配済みの業者がある場合に見積を登録できます。</p>}
               {desktop && repair.owner_report_estimates && <EstimateSection repairId={repair.id} estimates={repair.owner_report_estimates} canUpdate={false} initialSummary={repair.description}/>}
             </>,
             schedule: <RepairCalendarSection repair={repair} view={desktop?"events":"all"} enabled={active}/>,
             history: desktop?<RepairCalendarSection repair={repair} view="history" enabled={active}/>:null,
-            owner: <EstimateSection repairId={repair.id} estimates={repair.owner_report_estimates} canUpdate={canUpdate} initialSummary={repair.description} />,
+            owner: <EstimateSection repairId={repair.id} estimates={repair.owner_report_estimates} canUpdate={canUpdate} initialSummary={repair.description} quotes={repair.vendor_quotes} />,
           }}/>
           )} />
 

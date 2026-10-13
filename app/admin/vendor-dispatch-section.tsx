@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import CalendarEventForm from "./calendar-event-form";
 import { confirmManualVendorDispatch, selectRepairVendor } from "./vendor-dispatch-actions";
 import type { RepairPhoto, TenantRepairMessage, VendorCandidate, VendorDispatchHistory } from "./types";
 import { managementRequest, manualMessageDraft, tenantLineTextMessages, uniqueDispatchPhotos, updateDraftPhotoCount } from "./vendor-dispatch-compose";
 import { repairPhotoSource, repairReportLabel, repairLocation } from '@/lib/repair-source';
+import VendorQuoteRequestControls from './vendor-quote-request-controls';
+import type { VendorQuoteRequestView } from './types';
 
 export const statusLabels: Record<string, string> = {
   candidate: "手配候補",
@@ -28,7 +30,9 @@ const formatDate = (value: string) => new Intl.DateTimeFormat("ja-JP", {
 
 export function VendorDispatchSection({ repairId, candidates, dispatches, canUpdate,
   unavailable, suggestedInstructions, propertyName, roomNumber, repairCategory,
-  repairDescription, repairPhotos, fallbackPhotoUrl, tenantMessages, managementCompanyName, sourceType, locationType }: {
+  repairDescription, repairPhotos, fallbackPhotoUrl, tenantMessages, managementCompanyName, sourceType, locationType, quoteRequests, quotesUnavailable }: {
+  quoteRequests?: VendorQuoteRequestView[];
+  quotesUnavailable?: boolean;
   sourceType?: string;
   locationType?: string;
   repairId: number;
@@ -47,6 +51,11 @@ export function VendorDispatchSection({ repairId, candidates, dispatches, canUpd
   managementCompanyName: string;
 }) {
   const router = useRouter();
+  useEffect(() => {
+    if (quoteRequests === undefined) return;
+    const timer = setInterval(() => { if (document.visibilityState === 'visible') router.refresh(); }, 30000);
+    return () => clearInterval(timer);
+  }, [router, quoteRequests === undefined]);
   const busy = useRef(false);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -203,6 +212,8 @@ export function VendorDispatchSection({ repairId, candidates, dispatches, canUpd
       手配履歴 {dispatches.length}件（新しい順）</p>}
     {!unavailable && dispatches.map((dispatch) => <article key={dispatch.id}
       className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      {!["candidate","cancelled"].includes(dispatch.status) && <VendorQuoteRequestControls repairId={repairId} dispatchId={dispatch.id}
+        request={quoteRequests?.find(request=>request.vendor_dispatch_id===dispatch.id)} canUpdate={canUpdate} unavailable={quotesUnavailable} />}
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div><p className="font-bold text-slate-900">{dispatch.vendorName}</p>
           <p className="text-sm text-slate-600">担当者：{dispatch.vendorContactName}</p></div>

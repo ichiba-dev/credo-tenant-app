@@ -193,6 +193,7 @@ test('admin composition widens the container and preserves viewer restrictions a
  const Admin=load('./admin-repairs.tsx',{'react':React,'react/jsx-runtime':jsx,'next/navigation':{useRouter:()=>({refresh(){}})},
   './repair-detail-tabs':{default:Stub},'./message-attachment':{default:Stub},'./repair-list-state':helper,'./admin-workspace.module.css':{default:{workspace:'workspace'}},'./repair-overview':{default:Stub},'./actions':{},'./photo-actions':{},'./repair-pdf-button':{default:Stub},'@/app/components/repair-image':{default:Stub},
   './estimate-section':{default:Stub},'./message-section':{MessageSection:Stub},'./vendor-quote-upload-form':{VendorQuoteUploadForm:Stub},
+  './vendor-quote-list':{default:Stub},
   './vendor-dispatch-section':{VendorDispatchSection:Stub},'./repair-calendar-section':{default:Stub},'./repair-list':{default:List},
   'next/link':{default:({children,...props})=>React.createElement('a',props,children)}}).default;
  const html=renderToStaticMarkup(React.createElement(Admin,{repairs:[base],canUpdate:false,calendarOverview:React.createElement('p',null,'CALENDAR_SLOT')},'LINE_NOTICE'));

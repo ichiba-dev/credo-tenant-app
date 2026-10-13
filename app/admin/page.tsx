@@ -14,6 +14,7 @@ import type { UnassignedLineAttachment } from "./types";
 import { getLinkedLineAttachments } from "./linked-line-attachment-data";
 import { getOutboundAttachments } from "./outbound-attachment-data";
 import { getVendorDispatchData } from "./vendor-dispatch-data";
+import { getVendorQuoteData } from './vendor-quote-data';
 import UnassignedLineNotice from "./unassigned-line-notice";
 import { getCalendarEvents } from "./calendar-data";
 import { japanDay, nextDay } from "./calendar-state";
@@ -71,6 +72,10 @@ export default async function AdminPage() {
   } catch {
     repairs = repairs.map((repair) => ({ ...repair, vendor_dispatch_unavailable: true }));
   }
+  try {
+    const quotes = await getVendorQuoteData(context.organizationId, repairs.map(repair=>repair.id));
+    repairs = repairs.map(repair=>({...repair,vendor_quotes:quotes[repair.id]?.quotes??[],vendor_quote_requests:quotes[repair.id]?.requests??[]}));
+  } catch { repairs = repairs.map(repair=>({...repair,vendor_quotes_unavailable:true})); }
   const now=Date.now(),today=japanDay(now);
   let calendarEvents;
   const calendarUntil=[nextDay(today,2),nextDay(weekDays(today)[6])].sort().at(-1)!;

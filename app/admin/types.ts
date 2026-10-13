@@ -96,6 +96,15 @@ export type VendorDispatchHistory = {
   messages: VendorDispatchMessage[];
 };
 
+export type VendorQuoteRequestView = { id: string; vendor_dispatch_id: string; status: string; expires_at: string; created_at: string; submitted_at: string | null; revoked_at: string | null };
+export type VendorQuoteView = {
+  id: string; dispatch_id: string; vendorName: string; received_at: string; vendor_quote_number: string | null;
+  valid_until: string | null; revision_no: number; amount_ex_tax: number; tax_amount: number; amount_inc_tax: number;
+  submissionPath: 'vendor' | 'staff'; notes: string | null;
+  files: { id: string; original_filename: string }[];
+  lines: { id: string; description: string; quantity: number; unit: string; unit_price_ex_tax: number; tax_rate: number; line_amount_ex_tax: number }[];
+};
+
 export type AdminRepair = {
   source_type?: string;
   source_channel?: string;
@@ -122,6 +131,9 @@ export type AdminRepair = {
   vendor_dispatches?: VendorDispatchHistory[];
   vendor_candidates?: VendorCandidate[];
   vendor_dispatch_unavailable?: boolean;
+  vendor_quotes?: VendorQuoteView[];
+  vendor_quote_requests?: VendorQuoteRequestView[];
+  vendor_quotes_unavailable?: boolean;
 };
 
 export type TenantRepairMessage = {

@@ -192,6 +192,7 @@ test('detail slots reuse LINE, dispatch, quotes, photos, calendar, timeline and 
  const imports={'react':h.hooks,'react/jsx-runtime':jsx,'next/navigation':{useRouter:()=>({refresh(){}})},
   './admin-workspace.module.css':{default:{workspace:'workspace'}},'./repair-overview':{default:Stub},'./actions':{},'./photo-actions':{},'./repair-pdf-button':{default:Stub},'@/app/components/repair-image':{default:Stub},
   './estimate-section':{default:Stub},'./message-section':{MessageSection:Stub},'./vendor-quote-upload-form':{VendorQuoteUploadForm:Stub},
+  './vendor-quote-list':{default:Stub},
   './vendor-dispatch-section':{VendorDispatchSection:Stub},'./repair-calendar-section':{default:Stub},'./repair-list':{default:List},
   './repair-list-state':helper,'./repair-detail-tabs':{default:Tabs},'./message-attachment':{default:Stub},'next/link':{default:Stub}};
  const Admin=load('./admin-repairs.tsx',imports).default;
@@ -210,7 +211,7 @@ test('detail slots reuse LINE, dispatch, quotes, photos, calendar, timeline and 
    assert.match(renderToStaticMarkup(s.files),/オーナー/);assert.equal(s.vendors.props.locationType,'common_area');
   }
   assert.equal(s.schedule.props.view,'events');assert.equal(s.history.props.view,'history');
-  assert.equal(nodes(s.estimates).filter(n=>n.props?.dispatchId==='d').length,canUpdate?1:0);
+  assert.equal(nodes(s.estimates).filter(n=>n.props?.dispatches?.some(d=>d.id==='d')).length,canUpdate?1:0);
   assert.equal(nodes(s.overview).find(n=>n.type==='textarea').props.readOnly,!canUpdate);
   assert.ok(nodes(s.overview).filter(n=>n.type==='button').every(n=>n.props.disabled===!canUpdate));
   assert.ok(nodes(s.files).some(n=>n.type===Stub&&n.props.repairId===1));

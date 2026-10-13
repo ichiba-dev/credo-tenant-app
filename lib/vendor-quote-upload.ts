@@ -13,6 +13,7 @@ export type VendorQuoteUploadState = {
   actor: string; organizationId: string; repairId: number; dispatchId: string;
   quoteId: string; fileId: string; requestId: string; filename: string;
   size: number; sha256: string; receivedAt: string; uploadIssuedAt: string; expiresAt: number;
+  quoteRequestId?: string;
 };
 
 export function isUuid(value: unknown): value is string { return typeof value === "string" && UUID.test(value); }
@@ -55,6 +56,7 @@ export function readUploadState(ticket: unknown): VendorQuoteUploadState | null 
   try {
     const state = JSON.parse(Buffer.from(parts[0],"base64url").toString("utf8")) as VendorQuoteUploadState;
     if (!isUuid(state.actor) || !isUuid(state.organizationId) || !Number.isSafeInteger(state.repairId)
+      || (state.quoteRequestId !== undefined && !isUuid(state.quoteRequestId))
       || state.repairId <= 0 || !isUuid(state.dispatchId) || !isUuid(state.quoteId)
       || !isUuid(state.fileId) || !isValidPdfInput({filename:state.filename,size:state.size,
         mime:"application/pdf",sha256:state.sha256,requestId:state.requestId})

@@ -4,6 +4,8 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { OwnerReportEstimates } from "./types";
 import { createOwnerReport } from "./owner-report-actions";
+import VendorQuoteOwnerTransfer from './vendor-quote-owner-transfer';
+import type { VendorQuoteView } from './types';
 
 const MAX_SIZE = 15 * 1024 * 1024;
 const allowedTypes = new Set(["application/pdf", "image/jpeg", "image/png"]);
@@ -22,7 +24,8 @@ function typeLabel(mime: string) {
   return mime;
 }
 
-export default function EstimateSection({ repairId, estimates, canUpdate, initialSummary }: {
+export default function EstimateSection({ repairId, estimates, canUpdate, initialSummary, quotes }: {
+  quotes?: VendorQuoteView[];
   repairId: number;
   estimates: OwnerReportEstimates | null;
   canUpdate: boolean;
@@ -80,6 +83,7 @@ export default function EstimateSection({ repairId, estimates, canUpdate, initia
               </button>
             </div>
             {createMessage && <p role="status" className="mt-3 text-sm text-red-700">{createMessage}</p>}
+            <VendorQuoteOwnerTransfer repairId={repairId} quotes={quotes??[]} hasReport={false} summary={summary}/>
           </div>
         ) : (
           <p className="mt-3 text-sm text-gray-600">閲覧専用のため、オーナー報告は作成できません。</p>
@@ -177,6 +181,7 @@ export default function EstimateSection({ repairId, estimates, canUpdate, initia
           ))}
         </ul>
       )}
+      {canUpdate&&<VendorQuoteOwnerTransfer repairId={repairId} quotes={quotes??[]} hasReport summary={summary}/>}
     </section>
   );
 }
