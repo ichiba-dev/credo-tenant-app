@@ -3,14 +3,16 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import vm from "node:vm";
 import ts from "typescript";
+import * as jsx from 'react/jsx-runtime';
+import { renderToStaticMarkup } from 'react-dom/server';
 
-function setup({ repairId = 14, user = { id: "user-a" }, owner = { id: 2, name: "Owner" }, recipients, reportAccess, organization = "org-a", photos = [{ storage_path: "path", sort_order: 1 }], estimates = [], signFails = false } = {}) {
+function setup({ repairId = 14, user = { id: "user-a" }, owner = { id: 2, name: "Owner", auth_user_id: 'user-a', organization_id: 'org-a', is_active: true }, recipients, reportAccess, organization = "org-a", repair = {}, photos = [{ storage_path: "path", sort_order: 1 }], estimates = [], signFails = false } = {}) {
   const queries = []; const signed = [];
   class PhotoUnavailableError extends Error {}
   if (recipients === undefined) recipients = [{ owner_report_id: 3, organization_id: organization }];
   if (reportAccess === undefined) reportAccess = { id: 3, organization_id: organization, repair_request_id: repairId };
   photos = photos.map((photo) => ({ repair_id: repairId, organization_id: organization, ...photo }));
-  const responses = [owner, recipients, { id: repairId, organization_id: organization }, reportAccess, { id: 3, organization_id: organization, repair_request_id: repairId }, photos, { decision: "pending" }, estimates];
+  const responses = [owner, recipients, { id: repairId, organization_id: organization, ...repair }, reportAccess, { id: 3, organization_id: organization, repair_request_id: repairId }, photos, { decision: "pending" }, estimates];
   const db = { from(table) {
     const query = { table, filters: [] }; queries.push(query);
     const data = responses.shift();
@@ -25,14 +27,14 @@ function setup({ repairId = 14, user = { id: "user-a" }, owner = { id: 2, name: 
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX },
   }).outputText;
   const imports = {
-    "react/jsx-runtime": { jsx: () => null, jsxs: () => null },
+    "react/jsx-runtime": jsx,
     "next/link": { default: () => null },
     "next/navigation": { notFound() { throw new Error("notFound"); }, redirect() { throw new Error("redirect"); } },
     "next/server": { connection: async () => {} },
     "@/lib/supabase-auth/server": { createAuthServerClient: async () => ({ auth: { getUser: async () => ({ data: { user }, error: null }) } }) },
     "@/lib/supabase-server": { createServerSupabaseClient: () => db },
     "@/lib/repair-id": { parseRepairId: value => /^[1-9][0-9]*$/.test(value) && Number.isSafeInteger(Number(value)) ? Number(value) : null },
-    "./approval-form": {}, "@/app/components/repair-image": {},
+    "./approval-form": { ApprovalForm: ({ reportId }) => jsx.jsx('form', { 'data-report-id': reportId }) }, "@/app/components/repair-image": { default: () => null },
     "@/lib/repair-photo-urls": { PhotoUnavailableError, resolveRepairPhotoUrl: async (photo, org, id) => {
       signed.push({ photo, org, id });
       if (signFails === "authorization") throw new Error("Forbidden");
@@ -51,6 +53,50 @@ test("owner photo signing follows recipient/report authorization and company/rep
   assert.equal(JSON.stringify(photoQuery.filters), JSON.stringify([["repair_id",14],["organization_id","org-a"]]));
   const reportQuery=s.queries.find(q=>q.table==="owner_reports"&&q.filters.some(([key])=>key==="repair_request_id"));
   assert.ok(reportQuery.filters.some(([key,value])=> key === "repair_request_id" && value === 14));
+});
+
+const selfRepair = { source_type: 'owner', source_owner_id: 2, status: '受付', created_at: '2026-10-13', property_name: 'イリスアール', room_number: '101', category: '給湯器', description: '修理依頼' };
+for (const status of ['受付', '手配中', '完了']) test(`own request detail without report renders ${status}`, async () => {
+  const s = setup({ repairId: 27, recipients: [], repair: { ...selfRepair, status } });
+  const html = renderToStaticMarkup(await s.page());
+  assert.match(html, /自分の修理依頼/); assert.match(html, /イリスアール/); assert.match(html, /101号室/);
+  assert.ok(html.includes(status)); assert.match(html, /受付日/); assert.match(html, /修理依頼/);
+  assert.ok(!s.queries.some(q => ['owner_reports', 'owner_approvals', 'owner_report_estimate_files'].includes(q.table)));
+  assert.ok(s.queries.find(q => q.table === 'repair_requests').filters.some(([key,value]) => key === 'organization_id' && value === 'org-a'));
+});
+
+test('self tracking rejects other owners, organizations, tenant origin and inactive or mismatched auth', async () => {
+  for (const options of [
+    { repair: { ...selfRepair, source_owner_id: 3 } },
+    { repair: selfRepair, organization: 'org-b' },
+    { repair: { ...selfRepair, source_type: 'tenant' } },
+    { repair: selfRepair, owner: { id: 2, auth_user_id: 'user-a', organization_id: 'org-a', is_active: false } },
+    { repair: selfRepair, owner: { id: 2, auth_user_id: 'user-b', organization_id: 'org-a', is_active: true } },
+  ]) {
+    const s = setup({ recipients: [], ...options });
+    await assert.rejects(s.page(), /notFound/); assert.equal(s.signed.length, 0);
+  }
+});
+
+test('self request with another authorized report candidate still tracks without a report for this repair', async () => {
+  const s = setup({ repair: selfRepair, reportAccess: null });
+  assert.match(renderToStaticMarkup(await s.page()), /自分の修理依頼/);
+  assert.ok(!s.queries.some(q => q.table === 'owner_approvals'));
+});
+
+test('reported self request keeps existing report, estimate and approval queries', async () => {
+  const s = setup({ repair: selfRepair });
+  const html = renderToStaticMarkup(await s.page());
+  assert.match(html, /自分の修理依頼・修繕報告/); assert.match(html, /対応状況/); assert.match(html, /data-report-id="3"/);
+  for (const table of ['owner_reports', 'owner_approvals', 'owner_report_estimate_files']) assert.ok(s.queries.some(q => q.table === table));
+  assert.equal(s.signed.length, 1);
+});
+
+test('existing report-only tenant request still renders report and approval', async () => {
+  const s = setup({ repair: { ...selfRepair, source_type: 'tenant', source_owner_id: null, tenant_name: '入居者' } });
+  const html = renderToStaticMarkup(await s.page());
+  assert.match(html, /CREDOからのご報告/); assert.match(html, /入居者からの報告/); assert.match(html, /data-report-id="3"/);
+  assert.doesNotMatch(html, /自分の修理依頼/);
 });
 test("unauthenticated/non-owner/non-recipient/unauthorized report or missing company cannot sign", async () => {
   for (const options of [{user:null},{owner:null},{recipients:[]},{reportAccess:null},{organization:null}]) {

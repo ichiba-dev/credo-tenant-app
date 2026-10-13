@@ -33,7 +33,7 @@ export default async function OwnerRepairsPage() {
 
   let repairs;
   try {
-    repairs = await getOwnerRepairList(owner.id);
+    repairs = await getOwnerRepairList(owner.id, owner.organization_id);
   } catch {
     return <main className="p-6"><p role="alert">修理案件を取得できませんでした。時間をおいて再読み込みしてください。</p></main>;
   }
@@ -44,13 +44,13 @@ export default async function OwnerRepairsPage() {
         <header className="overflow-hidden rounded-3xl bg-[#0b2e59] px-6 py-7 text-white shadow-lg sm:px-8">
           <p className="notranslate text-lg font-bold tracking-[0.22em]" translate="no">CREDO</p>
           <h1 className="mt-5 text-2xl font-bold sm:text-3xl">修理案件一覧</h1>
-          <p className="mt-2 text-sm text-slate-300">{owner.name} 様に届いている修繕報告です。</p>
+          <p className="mt-2 text-sm text-slate-300">{owner.name} 様の修理依頼と届いた修繕報告です。</p>
         </header>
 
         <Link href="/owner/repairs/new" className="mt-6 block rounded-xl bg-[#0b2e59] px-5 py-3 text-center font-bold text-white">修理を依頼する</Link>
         {repairs.length === 0 ? (
           <section className="mt-6 rounded-2xl bg-white p-8 text-center shadow-sm">
-            <p className="font-medium text-slate-600">現在確認が必要な修理案件はありません。</p>
+            <p className="font-medium text-slate-600">現在表示できる修理依頼・修繕報告はありません。</p>
           </section>
         ) : (
           <div className="mt-6 space-y-4">
@@ -60,17 +60,19 @@ export default async function OwnerRepairsPage() {
                 <article key={repair.repairId} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
+                      <p className="mb-2 text-xs font-bold text-slate-500">{repair.isOwnRequest ? "自分の修理依頼" : "届いた修繕報告"}</p>
                       <p className="font-bold text-[#0b2e59]">{repair.propertyName} {repair.locationType === 'common_area' ? '共用部' : `${repair.roomNumber}号室`}</p>
                       <h2 className="mt-2 text-xl font-bold text-slate-900">{repair.category}</h2>
                     </div>
-                    <span className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold ${decisionStyles[decision] ?? "bg-slate-100 text-slate-700"}`}>
+                    {repair.reportCreatedAt && <span className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold ${decisionStyles[decision] ?? "bg-slate-100 text-slate-700"}`}>
                       {decisionLabels[decision] ?? "確認中"}
-                    </span>
+                    </span>}
                   </div>
                   <p className="mt-3 line-clamp-3 whitespace-pre-wrap text-sm leading-6 text-slate-600">{repair.description}</p>
                   <dl className="mt-4 grid grid-cols-1 gap-2 border-t border-slate-100 pt-4 text-xs text-slate-500 sm:grid-cols-2">
                     <div><dt className="inline font-medium">受付日：</dt><dd className="inline">{formatDate(repair.repairCreatedAt)}</dd></div>
-                    <div><dt className="inline font-medium">報告作成日：</dt><dd className="inline">{formatDate(repair.reportCreatedAt)}</dd></div>
+                    {repair.isOwnRequest && <div><dt className="inline font-medium">対応状況：</dt><dd className="inline">{repair.status}</dd></div>}
+                    {repair.reportCreatedAt && <div><dt className="inline font-medium">報告作成日：</dt><dd className="inline">{formatDate(repair.reportCreatedAt)}</dd></div>}
                   </dl>
                   <Link href={`/owner/repairs/${repair.repairId}`} className="mt-5 block rounded-xl bg-[#0b2e59] px-5 py-3 text-center font-bold text-white transition hover:bg-[#123d70]">
                     詳細を見る

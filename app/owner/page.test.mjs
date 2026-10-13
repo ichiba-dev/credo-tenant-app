@@ -6,7 +6,7 @@ import ts from "typescript";
 import * as jsx from 'react/jsx-runtime';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-function setup({ user = { id: "user-a" }, owner = { id: "owner-a", name: "Owner", auth_user_id:'user-a',organization_id:'org-a',is_active:true }, authError=null, ownerError=null, throws=false } = {}, file='./page.tsx') {
+function setup({ user = { id: "user-a" }, owner = { id: "owner-a", name: "Owner", auth_user_id:'user-a',organization_id:'org-a',is_active:true }, authError=null, ownerError=null, throws=false, repairs=[] } = {}, file='./page.tsx') {
   const listCalls=[]; const redirects=[];
   const exports={};
   const source=ts.transpileModule(readFileSync(new URL(file,import.meta.url),"utf8"),{
@@ -24,7 +24,7 @@ function setup({ user = { id: "user-a" }, owner = { id: "owner-a", name: "Owner"
     if(name==="next/server")return{connection:async()=>{}};
     if(name==="@/lib/supabase-auth/server")return{createAuthServerClient:async()=>({auth:{getUser:async()=>({data:{user},error:authError})}})};
     if(name==="@/lib/supabase-server")return{createServerSupabaseClient:()=>({from:()=>builder})};
-    if(name==="./data")return{getOwnerRepairList:async id=>{listCalls.push(id);return[];}};
+    if(name==="./data")return{getOwnerRepairList:async (id,org)=>{listCalls.push([id,org]);return repairs;}};
     throw new Error(name);
   }});
   return{page:exports.default,listCalls,redirects,exports};
@@ -32,7 +32,21 @@ function setup({ user = { id: "user-a" }, owner = { id: "owner-a", name: "Owner"
 
 test("authenticated owner list derives owner ID from auth and never accepts it from the client",async()=>{
   const s=setup(); await s.page();
-  assert.equal(JSON.stringify(s.listCalls),JSON.stringify(["owner-a"]));
+  assert.equal(JSON.stringify(s.listCalls),JSON.stringify([["owner-a","org-a"]]));
+});
+
+for(const status of ['受付','手配中','完了'])test(`own request renders ${status} without report date or approval badge`,async()=>{
+  const s=setup({repairs:[{repairId:27,propertyName:'イリスアール',roomNumber:'101',category:'給湯器',description:'修理依頼',repairCreatedAt:'2026-10-13',reportCreatedAt:null,isOwnRequest:true,status,decision:null}]});
+  const html=renderToStaticMarkup(await s.page());
+  assert.match(html,/自分の修理依頼/);assert.match(html,/イリスアール/);assert.match(html,/101号室/);
+  assert.ok(html.includes(status));assert.match(html,/受付日/);
+  assert.doesNotMatch(html,/報告作成日|確認中/);
+});
+
+test('reported own request retains approval and report date alongside tracking status',async()=>{
+  const s=setup({repairs:[{repairId:27,propertyName:'イリスアール',roomNumber:'',locationType:'common_area',category:'共用部',description:'修理依頼',repairCreatedAt:'2026-10-12',reportCreatedAt:'2026-10-13',isOwnRequest:true,status:'完了',decision:'approved'}]});
+  const html=renderToStaticMarkup(await s.page());
+  assert.match(html,/自分の修理依頼/);assert.match(html,/共用部/);assert.match(html,/承認済み/);assert.match(html,/報告作成日/);assert.match(html,/完了/);
 });
 
 test("unauthenticated owner list redirects to the safe owner return path",async()=>{

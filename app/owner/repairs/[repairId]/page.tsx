@@ -74,7 +74,7 @@ export default async function OwnerRepairReportPage({ params }: { params: Promis
 
   const { data: owner, error: ownerAuthError } = await supabase
     .from("owners")
-    .select("id, name")
+    .select("id, name, auth_user_id, organization_id, is_active")
     .eq("auth_user_id", user.id)
     .maybeSingle();
 
@@ -82,7 +82,7 @@ export default async function OwnerRepairReportPage({ params }: { params: Promis
     throw new Error("オーナー認証情報の取得に失敗しました。");
   }
 
-  if (!owner) {
+  if (!owner || owner.auth_user_id !== user.id || !owner.organization_id || owner.is_active !== true) {
     notFound();
   }
 
@@ -90,7 +90,8 @@ export default async function OwnerRepairReportPage({ params }: { params: Promis
     await supabase
       .from("owner_report_recipients")
       .select("owner_report_id, organization_id, is_approval_required")
-      .eq("owner_id", owner.id);
+      .eq("owner_id", owner.id)
+      .eq("organization_id", owner.organization_id);
 
   if (recipientCandidatesError) {
     throw new Error("報告先オーナーの確認に失敗しました。");
@@ -98,22 +99,24 @@ export default async function OwnerRepairReportPage({ params }: { params: Promis
 
   const { data: repair, error: repairError } = await supabase
     .from("repair_requests")
-    .select("id, organization_id, property_name, room_number, tenant_name, category, description, storage_path, photo_url, location_type, source_type, source_label")
+    .select("id, organization_id, property_name, room_number, tenant_name, category, description, storage_path, photo_url, location_type, source_type, source_owner_id, source_label, status, created_at")
     .eq("id", repairId)
+    .eq("organization_id", owner.organization_id)
     .maybeSingle();
 
   if (repairError) throw new Error("修理依頼の取得に失敗しました。");
-  if (!repair?.organization_id || repair.id !== repairId) notFound();
+  if (!repair?.organization_id || repair.id !== repairId || repair.organization_id !== owner.organization_id) notFound();
+  const isOwnRequest = repair.source_type === "owner" && repair.source_owner_id === owner.id;
 
   const candidateReportIds = (recipientCandidates ?? [])
     .filter((recipient) => recipient.organization_id === repair.organization_id)
     .map((recipient) => recipient.owner_report_id);
 
-  if (candidateReportIds.length === 0) {
+  if (candidateReportIds.length === 0 && !isOwnRequest) {
     notFound();
   }
 
-  const { data: authorizedReport, error: authorizationError } = await supabase
+  const { data: authorizedReport, error: authorizationError } = candidateReportIds.length ? await supabase
     .from("owner_reports")
     .select("id, organization_id, repair_request_id")
     .eq("organization_id", repair.organization_id)
@@ -121,14 +124,41 @@ export default async function OwnerRepairReportPage({ params }: { params: Promis
     .in("id", candidateReportIds)
     .order("created_at", { ascending: false })
     .limit(1)
-    .maybeSingle();
+    .maybeSingle() : { data: null, error: null };
 
   if (authorizationError) {
     throw new Error("修理報告の閲覧権限確認に失敗しました。");
   }
 
-  if (!authorizedReport || authorizedReport.organization_id !== repair.organization_id || authorizedReport.repair_request_id !== repairId) {
+  if (authorizedReport && (authorizedReport.organization_id !== repair.organization_id || authorizedReport.repair_request_id !== repairId)) {
     notFound();
+  }
+
+  // Self-submission permits request tracking only; report/approval access still requires a recipient link.
+  if (!authorizedReport) {
+    if (!isOwnRequest) notFound();
+    const receivedAt = new Intl.DateTimeFormat("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(repair.created_at));
+    return (
+      <main className="min-h-screen bg-[#f3f5f7] px-4 py-6 text-slate-900 sm:py-10">
+        <div className="mx-auto max-w-xl overflow-hidden rounded-3xl bg-white shadow-lg">
+          <div className="bg-[#f8f3e8] px-6 py-3"><Link href="/owner" className="text-sm font-bold text-[#0b2e59]">← 案件一覧へ戻る</Link></div>
+          <header className="bg-[#0b2e59] px-6 py-7 text-white">
+            <p className="text-sm text-slate-300">自分の修理依頼</p>
+            <h1 className="mt-2 text-2xl font-bold">{repair.category}</h1>
+          </header>
+          <div className="space-y-5 p-6">
+            <dl>
+              <DetailRow label="物件名" value={repair.property_name} />
+              <DetailRow label="場所" value={repair.location_type === 'common_area' ? '共用部' : `${repair.room_number ?? ''}号室`} />
+              <DetailRow label="受付日" value={receivedAt} />
+              <DetailRow label="対応状況" value={repair.status} />
+            </dl>
+            <section><h2 className="font-bold text-[#0b2e59]">ご依頼内容</h2><p className="mt-3 whitespace-pre-wrap text-sm leading-7">{repair.description}</p></section>
+            <p className="text-sm text-slate-500">届いた修繕報告はまだありません。</p>
+          </div>
+        </div>
+      </main>
+    );
   }
 
   const [reportResult, photosResult] = await Promise.all([
@@ -244,7 +274,7 @@ export default async function OwnerRepairReportPage({ params }: { params: Promis
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-lg font-bold tracking-[0.22em]">CREDO</p>
-              <p className="mt-1 text-sm text-slate-300">修繕報告</p>
+              <p className="mt-1 text-sm text-slate-300">{isOwnRequest ? "自分の修理依頼・修繕報告" : "修繕報告"}</p>
             </div>
             <span className="shrink-0 rounded-full border border-[#d8c49c]/60 bg-white/10 px-3 py-1.5 text-sm font-bold text-[#f3dfb2]">
               {decisionBadgeLabels[decision] ?? decision}
@@ -267,6 +297,7 @@ export default async function OwnerRepairReportPage({ params }: { params: Promis
               <DetailRow label="場所" value={repair.location_type === 'common_area' ? '共用部' : `${repair.room_number ?? ''}号室`} />
               <DetailRow label={repair.source_type === 'owner' ? 'オーナー名' : '入居者名'} value={repair.source_type === 'owner' ? repair.source_label : repair.tenant_name} />
               <DetailRow label="不具合箇所" value={repair.category} />
+              {isOwnRequest && <DetailRow label="対応状況" value={repair.status} />}
             </dl>
           </section>
 
@@ -328,7 +359,7 @@ export default async function OwnerRepairReportPage({ params }: { params: Promis
           </section>
 
           <section className="rounded-2xl bg-slate-50 p-5">
-            <h2 className="font-bold text-[#0b2e59]">入居者からの報告</h2>
+            <h2 className="font-bold text-[#0b2e59]">{repair.source_type === 'owner' ? 'オーナーからの申告' : '入居者からの報告'}</h2>
             <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-700">
               {repair.description}
             </p>
